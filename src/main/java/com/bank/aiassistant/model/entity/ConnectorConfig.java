@@ -3,7 +3,9 @@ package com.bank.aiassistant.model.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 
@@ -33,6 +35,7 @@ public class ConnectorConfig {
     private String encryptedCredentials;
 
     /** Non-sensitive config JSON: { "projectKeys": [...], "maxResults": 50 } */
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "JSONB")
     private String config;
 
