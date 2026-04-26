@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -42,7 +43,8 @@ public class GitHubContextIndexService {
             return;
         }
 
-        List<GithubContentIndex> entities = new ArrayList<>(documents.size());
+        // Ensure uniqueness by URL before insert, matching DB unique constraint (connector_id, url).
+        Map<String, GithubContentIndex> byUrl = new LinkedHashMap<>();
         for (Map.Entry<String, Map<String, Object>> entry : documents) {
             Map<String, Object> meta = entry.getValue() != null ? new HashMap<>(entry.getValue()) : new HashMap<>();
             String sourceType = asString(meta.getOrDefault("content_type", "unknown"));
@@ -51,8 +53,11 @@ public class GitHubContextIndexService {
             String url = asString(meta.getOrDefault("url",
                     "https://github.com/" + asString(meta.getOrDefault("repo", "unknown"))));
             Instant sourceUpdatedAt = parseInstant(meta.get("updated_at"));
+            if (url == null || url.isBlank()) {
+                continue;
+            }
 
-            entities.add(GithubContentIndex.builder()
+            GithubContentIndex candidate = GithubContentIndex.builder()
                     .connectorId(connector.getId())
                     .userId(connector.getOwner().getId())
                     .sourceType(sourceType)
@@ -62,8 +67,14 @@ public class GitHubContextIndexService {
                     .body(body)
                     .metadata(meta)
                     .sourceUpdatedAt(sourceUpdatedAt)
-                    .build());
+                    .build();
+
+            GithubContentIndex existing = byUrl.get(url);
+            if (existing == null || shouldReplace(existing, candidate)) {
+                byUrl.put(url, candidate);
+            }
         }
+        List<GithubContentIndex> entities = new ArrayList<>(byUrl.values());
         repository.saveAll(entities);
     }
 
@@ -133,5 +144,19 @@ public class GitHubContextIndexService {
 
     private String asString(Object value) {
         return value == null ? null : value.toString();
+    }
+
+    private boolean shouldReplace(GithubContentIndex current, GithubContentIndex candidate) {
+        Instant currentTs = current.getSourceUpdatedAt();
+        Instant candidateTs = candidate.getSourceUpdatedAt();
+        if (currentTs == null && candidateTs != null) {
+            return true;
+        }
+        if (currentTs != null && candidateTs != null && candidateTs.isAfter(currentTs)) {
+            return true;
+        }
+        return candidate.getBody() != null
+                && current.getBody() != null
+                && candidate.getBody().length() > current.getBody().length();
     }
 }

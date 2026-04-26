@@ -14,6 +14,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 
 @Slf4j
 @Service
@@ -25,6 +27,7 @@ public class GitHubConnectorSyncService {
     private final GitHubContextIndexService contextIndexService;
 
     private static final Duration STALE_AFTER = Duration.ofMinutes(30);
+    private final ConcurrentHashMap<String, ReentrantLock> connectorLocks = new ConcurrentHashMap<>();
 
     @Async
     public void syncConnectorAsync(String connectorId) {
@@ -33,24 +36,33 @@ public class GitHubConnectorSyncService {
 
     @Transactional
     public boolean syncConnector(String connectorId) {
-        ConnectorConfig config = connectorConfigRepository.findById(connectorId).orElse(null);
-        if (config == null || !config.isEnabled() || !"GITHUB".equalsIgnoreCase(config.getConnectorType())) {
+        ReentrantLock lock = connectorLocks.computeIfAbsent(connectorId, id -> new ReentrantLock());
+        if (!lock.tryLock()) {
+            log.debug("Skipping GitHub sync because connector is already syncing: {}", connectorId);
             return false;
         }
-
+        ConnectorConfig config = connectorConfigRepository.findById(connectorId).orElse(null);
         try {
-            List<Map.Entry<String, Map<String, Object>>> docs = connectorRegistry.fetchAll(connectorId);
-            contextIndexService.replaceConnectorCorpus(config, docs);
-            config.setLastSyncAt(Instant.now());
-            config.setLastError(null);
-            connectorConfigRepository.save(config);
-            log.info("GitHub connector sync complete: connectorId={} docs={}", connectorId, docs.size());
-            return true;
-        } catch (Exception ex) {
-            config.setLastError(truncate(ex.getMessage(), 500));
-            connectorConfigRepository.save(config);
-            log.error("GitHub connector sync failed: connectorId={} error={}", connectorId, ex.getMessage(), ex);
-            return false;
+            if (config == null || !config.isEnabled() || !"GITHUB".equalsIgnoreCase(config.getConnectorType())) {
+                return false;
+            }
+
+            try {
+                List<Map.Entry<String, Map<String, Object>>> docs = connectorRegistry.fetchAll(connectorId);
+                contextIndexService.replaceConnectorCorpus(config, docs);
+                config.setLastSyncAt(Instant.now());
+                config.setLastError(null);
+                connectorConfigRepository.save(config);
+                log.info("GitHub connector sync complete: connectorId={} docs={}", connectorId, docs.size());
+                return true;
+            } catch (Exception ex) {
+                config.setLastError(truncate(ex.getMessage(), 500));
+                connectorConfigRepository.save(config);
+                log.error("GitHub connector sync failed: connectorId={} error={}", connectorId, ex.getMessage(), ex);
+                return false;
+            }
+        } finally {
+            lock.unlock();
         }
     }
 

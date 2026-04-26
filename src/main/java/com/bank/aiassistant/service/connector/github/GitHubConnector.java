@@ -16,6 +16,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -147,11 +148,16 @@ public class GitHubConnector implements DataSourceConnector {
                     ? "/orgs/" + org + "/repos?type=all&sort=pushed&per_page=" + MAX_REPOS
                     : "/user/repos?sort=pushed&per_page=" + MAX_REPOS + "&affiliation=owner,collaborator,organization_member";
             JsonNode arr = objectMapper.readTree(get(client, url));
-            List<JsonNode> repos = new ArrayList<>();
+            Map<String, JsonNode> byFullName = new LinkedHashMap<>();
             if (arr.isArray()) {
-                arr.forEach(repos::add);
+                arr.forEach(repo -> {
+                    String fullName = repo.path("full_name").asText(null);
+                    if (fullName != null && !fullName.isBlank()) {
+                        byFullName.putIfAbsent(fullName, repo);
+                    }
+                });
             }
-            return repos;
+            return new ArrayList<>(byFullName.values());
         } catch (Exception e) {
             log.error("Failed to fetch repos: {}", e.getMessage());
             return List.of();
