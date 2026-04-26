@@ -1,0 +1,200 @@
+spring:
+  application:
+    name: ai-assistant-poc
+
+  # ──────────────────────────────────────────────────────
+  # Database
+  # ──────────────────────────────────────────────────────
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:ragdb}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate   # Flyway handles schema; Hibernate only validates
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+    validate-on-migrate: false   # DEV: skip checksum validation (V2 was edited after apply)
+
+  # ──────────────────────────────────────────────────────
+  # Spring AI — OpenAI
+  # ──────────────────────────────────────────────────────
+  ai:
+    openai:
+      api-key: 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  # <-- Replace or set env var
+      chat:
+        options:
+          model: gpt-4o
+          temperature: 0.2       # Low temperature for factual banking assistant
+          max-tokens: 4096
+          top-p: 0.9
+      embedding:
+        options:
+          model: text-embedding-3-small   # 1536 dimensions, cost-effective
+      image:
+        options:
+          model: dall-e-3
+
+    # pgvector store
+    vectorstore:
+      pgvector:
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
+        dimensions: 1536             # Must match embedding model output
+        initialize-schema: false     # Flyway (V2) owns the vector_store schema
+
+  # ──────────────────────────────────────────────────────
+  # Cache (Caffeine L1)
+  # ──────────────────────────────────────────────────────
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=1000,expireAfterWrite=300s
+
+  # ──────────────────────────────────────────────────────
+  # File Upload
+  # ──────────────────────────────────────────────────────
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 50MB
+      max-request-size: 50MB
+
+  # ──────────────────────────────────────────────────────
+  # Mail (SMTP — for EmailSendTool)
+  # ──────────────────────────────────────────────────────
+  mail:
+    host: ${SMTP_HOST:smtp.gmail.com}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USER:your-email@gmail.com}
+    password: ${SMTP_PASSWORD:your-app-password}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+  # ──────────────────────────────────────────────────────
+  # Async thread pool
+  # ──────────────────────────────────────────────────────
+  task:
+    execution:
+      pool:
+        core-size: 4
+        max-size: 16
+        queue-capacity: 100
+
+# ──────────────────────────────────────────────────────
+# Application Custom Properties
+# ──────────────────────────────────────────────────────
+app:
+  jwt:
+    secret: bXlTdXBlclNlY3JldEtleUZvckpXVEF1dGhlbnRpY2F0aW9uMTIz
+    expiration-ms: 3600000          # 1 hour
+    refresh-expiration-ms: 604800000 # 7 days
+
+  encryption:
+    key: bXlTdXBlclNlY3JldEVuY3J5cHRpb25LZXkxMjM0NTY3OA==
+
+  chat:
+    context-window-messages: 20
+    system-prompt: |
+      You are an intelligent AI assistant for a financial services organisation.
+      You are helpful, professional, precise, and concise.
+      You have access to internal knowledge bases, project management tools, and document repositories.
+      Always cite your sources when referencing retrieved documents.
+      You follow strict data privacy and compliance guidelines.
+      If you are unsure, say so honestly — do not hallucinate.
+      Today's date: ${current.date:not set}.
+
+  guardrails:
+    rate-limit:
+      requests-per-minute: 20
+
+  artifacts:
+    output-dir: ${ARTIFACTS_DIR:${java.io.tmpdir}/ai-artifacts}
+    base-url: /api/artifacts
+
+# ──────────────────────────────────────────────────────
+# Actuator
+# ──────────────────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when-authorized
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+
+# ──────────────────────────────────────────────────────
+# Logging
+# ──────────────────────────────────────────────────────
+logging:
+  level:
+    root: INFO
+    com.bank.aiassistant: DEBUG
+    org.springframework.ai: INFO
+    org.springframework.security: WARN
+    org.hibernate.SQL: WARN
+
+# ──────────────────────────────────────────────────────
+# Server
+# ──────────────────────────────────────────────────────
+server:
+  port: ${PORT:8080}
+  servlet:
+    context-path: /
+  compression:
+    enabled: true
+    mime-types: application/json,text/plain,text/event-stream
+  error:
+    include-message: never
+    include-stacktrace: never
+
+---
+# Profile: local (override defaults for local development)
+spring:
+  config:
+    activate:
+      on-profile: local
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/ai_assistant
+
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY}   # Must be set in environment or .env
+
+logging:
+  level:
+    com.bank.aiassistant: DEBUG
+    org.springframework.ai: DEBUG

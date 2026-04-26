@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mvn compile *)",
+      "Bash(mvn clean *)",
+      "Bash(grep -v \"^\\\\[INFO\\\\] Running\\\\|^\\\\[INFO\\\\] up to date\\\\|^\\\\[INFO\\\\] audited\\\\|^\\\\[INFO\\\\] packages\\\\|^\\\\[INFO\\\\] Run\\\\|^\\\\[INFO\\\\] $\\\\|^\\\\[INFO\\\\] >\\\\|^\\\\[INFO\\\\] vite\\\\|^\\\\[INFO\\\\] transforming\\\\|^\\\\[INFO\\\\] rendering\\\\|^\\\\[INFO\\\\] computing\\\\|^\\\\[INFO\\\\] dist\\\\|^\\\\[INFO\\\\] ✓\\\\|^\\\\[INFO\\\\] built\")",
+      "Bash(grep -v \"^\\\\[INFO\\\\] Running\\\\|npm\\\\|audited\\\\|packages\\\\|vite\\\\|transforming\\\\|rendering\\\\|computing\\\\|dist/\\\\|built in\\\\|✓\\\\|funding\\\\|vulnerab\\\\|address\\\\|^\\\\[INFO\\\\] $\")",
+      "Bash(wait)",
+      "Bash(grep -v \"^\\\\[INFO\\\\] Copying\\\\|^\\\\[INFO\\\\] Comp\\\\|^\\\\[INFO\\\\] Recomp\\\\|^\\\\[INFO\\\\] $\")",
+      "Bash(javap -p \"/c/usbank poc development/ai-assistant-poc/target/classes/com/bank/aiassistant/security/jwt/JwtAuthenticationFilter.class\")",
+      "Bash(cmd /c \"where java\")",
+      "Bash(cmd /c \"java -version\")",
+      "Bash(cmd /c \"java -version 2>&1\")",
+      "Bash(cmd /c \"where javap 2>&1\")",
+      "Bash(/c/Users/Projj/.jdks/jdk-17/bin/javap -p \"/c/usbank poc development/ai-assistant-poc/target/classes/com/bank/aiassistant/security/jwt/JwtAuthenticationFilter.class\")",
+      "Bash(mvn dependency:build-classpath -q)",
+      "Bash(mvn exec:java -Dexec.mainClass=com.bank.aiassistant.security.jwt.JwtAuthenticationFilter)"
+    ]
+  }
+}

@@ -31,3 +31,36 @@ build/
 
 ### VS Code ###
 .vscode/
+=======
+# Environment / secrets — NEVER commit
+.env
+*.env.local
+
+# Maven
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Generated artifacts
+/tmp/ai-artifacts/
+artifacts/
+>>>>>>> f831b7f initial commit
