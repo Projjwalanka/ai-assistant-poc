@@ -21,4 +21,6 @@ public interface ConnectorConfigRepository extends JpaRepository<ConnectorConfig
     List<ConnectorConfig> findByOwnerIdAndConnectorTypeIgnoreCaseAndEnabledTrue(String ownerId, String connectorType);
 
     List<ConnectorConfig> findByConnectorTypeIgnoreCaseAndEnabledTrue(String connectorType);
+
+    List<ConnectorConfig> findByOwnerEmailAndConnectorTypeIgnoreCaseAndEnabledTrue(String ownerEmail, String connectorType);
 }

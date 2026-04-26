@@ -114,7 +114,7 @@ public class ChatService {
         }
 
         GitHubContextEngineeringService.GitHubContextResult gitHubContext =
-                gitHubContextEngineeringService.buildContext(user.getId(), userQuery, connectorIds);
+                gitHubContextEngineeringService.buildContext(user.getId(), user.getEmail(), userQuery, connectorIds);
         if (gitHubContext.context() != null && !gitHubContext.context().isBlank()) {
             context.append(gitHubContext.context()).append("\n");
         }

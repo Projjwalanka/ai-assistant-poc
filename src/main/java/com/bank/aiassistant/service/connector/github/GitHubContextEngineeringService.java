@@ -27,8 +27,11 @@ public class GitHubContextEngineeringService {
 
     public record GitHubContextResult(String context, Set<String> usedConnectorIds) {}
 
-    public GitHubContextResult buildContext(String userId, String userQuery, List<String> requestedConnectorIds) {
-        List<ConnectorConfig> scopedConnectors = resolveScope(userId, userQuery, requestedConnectorIds);
+    public GitHubContextResult buildContext(String userId,
+                                            String userEmail,
+                                            String userQuery,
+                                            List<String> requestedConnectorIds) {
+        List<ConnectorConfig> scopedConnectors = resolveScope(userId, userEmail, userQuery, requestedConnectorIds);
         if (scopedConnectors.isEmpty()) {
             return new GitHubContextResult("", Set.of());
         }
@@ -40,7 +43,7 @@ public class GitHubContextEngineeringService {
         Set<String> connectorIds = scopedConnectors.stream().map(ConnectorConfig::getId).collect(LinkedHashSet::new, Set::add, Set::addAll);
         List<RankedHit> fused = fusedRetrieve(userId, userQuery, connectorIds);
         if (fused.isEmpty()) {
-            return new GitHubContextResult("", connectorIds);
+            return new GitHubContextResult(noMatchContext(scopedConnectors), connectorIds);
         }
 
         StringBuilder sb = new StringBuilder();
@@ -64,7 +67,10 @@ public class GitHubContextEngineeringService {
         return new GitHubContextResult(sb.toString(), connectorIds);
     }
 
-    private List<ConnectorConfig> resolveScope(String userId, String query, List<String> requestedConnectorIds) {
+    private List<ConnectorConfig> resolveScope(String userId,
+                                               String userEmail,
+                                               String query,
+                                               List<String> requestedConnectorIds) {
         if (requestedConnectorIds != null && !requestedConnectorIds.isEmpty()) {
             List<ConnectorConfig> selected = new ArrayList<>();
             for (String id : requestedConnectorIds) {
@@ -81,7 +87,21 @@ public class GitHubContextEngineeringService {
         if (!looksLikeGitHubQuestion(query)) {
             return List.of();
         }
-        return connectorConfigRepository.findByOwnerIdAndConnectorTypeIgnoreCaseAndEnabledTrue(userId, "GITHUB");
+        List<ConnectorConfig> byOwnerId =
+                connectorConfigRepository.findByOwnerIdAndConnectorTypeIgnoreCaseAndEnabledTrue(userId, "GITHUB");
+        if (!byOwnerId.isEmpty()) {
+            return byOwnerId;
+        }
+
+        if (userEmail != null && !userEmail.isBlank()) {
+            List<ConnectorConfig> byOwnerEmail =
+                    connectorConfigRepository.findByOwnerEmailAndConnectorTypeIgnoreCaseAndEnabledTrue(userEmail, "GITHUB");
+            if (!byOwnerEmail.isEmpty()) {
+                log.warn("GitHub scope resolved by owner email fallback for user={}", userEmail);
+                return byOwnerEmail;
+            }
+        }
+        return List.of();
     }
 
     private List<RankedHit> fusedRetrieve(String userId, String query, Set<String> connectorIds) {
@@ -181,6 +201,16 @@ public class GitHubContextEngineeringService {
 
     private String toString(Object value) {
         return value == null ? null : value.toString();
+    }
+
+    private String noMatchContext(List<ConnectorConfig> scopedConnectors) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("\n## GitHub Context (Account-wide)\n");
+        sb.append("A GitHub account is connected and queryable in this session.\n");
+        sb.append("Connected GitHub connectors: ").append(scopedConnectors.size()).append("\n");
+        sb.append("No strongly matching repositories/issues/PRs were retrieved for this exact query.\n");
+        sb.append("You should still answer using available GitHub account-level understanding and suggest refining the query if needed.\n");
+        return sb.toString();
     }
 
     private record RankedHit(
