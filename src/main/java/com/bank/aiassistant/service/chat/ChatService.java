@@ -5,10 +5,12 @@ import com.bank.aiassistant.model.dto.chat.ChatResponse;
 import com.bank.aiassistant.model.entity.Conversation;
 import com.bank.aiassistant.model.entity.Message;
 import com.bank.aiassistant.model.entity.User;
+import com.bank.aiassistant.repository.ConnectorConfigRepository;
 import com.bank.aiassistant.repository.ConversationRepository;
 import com.bank.aiassistant.repository.UserRepository;
 import com.bank.aiassistant.service.agent.AgentOrchestrator;
 import com.bank.aiassistant.service.connector.ConnectorRegistry;
+import com.bank.aiassistant.service.connector.github.GitHubContextEngineeringService;
 import com.bank.aiassistant.service.guardrails.GuardrailChain;
 import com.bank.aiassistant.service.vector.VectorStoreService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -20,18 +22,19 @@ import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 
 import java.time.Instant;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Orchestrates the full chat turn:
- * <ol>
- *   <li>Guardrail input check</li>
- *   <li>Hybrid RAG retrieval (vector + live connectors)</li>
- *   <li>Prompt augmentation with retrieved context</li>
- *   <li>Agent loop (detect tool calls → execute → continue)</li>
- *   <li>Guardrail output check</li>
- *   <li>Persist and return</li>
- * </ol>
+ * 1) guardrail input check
+ * 2) context retrieval (vector + connectors)
+ * 3) prompt augmentation
+ * 4) agent run (tool calls)
+ * 5) guardrail output check
+ * 6) persistence
  */
 @Slf4j
 @Service
@@ -46,38 +49,24 @@ public class ChatService {
     private final ConnectorRegistry connectorRegistry;
     private final GuardrailChain guardrailChain;
     private final ObjectMapper objectMapper;
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Blocking Chat
-    // ─────────────────────────────────────────────────────────────────────────
+    private final GitHubContextEngineeringService gitHubContextEngineeringService;
+    private final ConnectorConfigRepository connectorConfigRepository;
 
     @Transactional
     public ChatResponse chat(ChatRequest request, String userEmail) {
         long start = System.currentTimeMillis();
         User user = resolveUser(userEmail);
 
-        // 1. Input guardrails
         String sanitizedInput = guardrailChain.checkInput(request.message(), userEmail);
-
-        // 2. Get or create conversation
         Conversation conversation = resolveConversation(request, user);
-
-        // 3. Save user message
         memoryService.saveUserMessage(conversation, sanitizedInput);
 
-        // 4. RAG: retrieve relevant context
-        String augmentedPrompt = buildAugmentedPrompt(sanitizedInput, request.connectorIds(), userEmail);
-
-        // 5. Build message history
+        String augmentedPrompt = buildAugmentedPrompt(user, sanitizedInput, request.connectorIds());
         var messages = memoryService.buildContext(conversation.getId(), augmentedPrompt, null);
 
-        // 6. Agent orchestration (handles tool calls internally)
         AgentOrchestrator.AgentResult result = agentOrchestrator.run(messages, conversation.getId());
-
-        // 7. Output guardrails
         String safeOutput = guardrailChain.checkOutput(result.content(), userEmail);
 
-        // 8. Persist assistant message
         String metadataJson = buildMetadataJson(result);
         Message assistantMessage = memoryService.saveAssistantMessage(
                 conversation, safeOutput, result.model(),
@@ -100,10 +89,6 @@ public class ChatService {
         );
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Streaming Chat
-    // ─────────────────────────────────────────────────────────────────────────
-
     @Transactional
     public Flux<String> chatStream(ChatRequest request, String userEmail) {
         User user = resolveUser(userEmail);
@@ -111,45 +96,64 @@ public class ChatService {
         Conversation conversation = resolveConversation(request, user);
         memoryService.saveUserMessage(conversation, sanitizedInput);
 
-        String augmentedPrompt = buildAugmentedPrompt(sanitizedInput, request.connectorIds(), userEmail);
+        String augmentedPrompt = buildAugmentedPrompt(user, sanitizedInput, request.connectorIds());
         var messages = memoryService.buildContext(conversation.getId(), augmentedPrompt, null);
 
         return agentOrchestrator.runStream(messages, conversation.getId())
                 .doOnError(ex -> log.error("Stream error for user={}", userEmail, ex));
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Helpers
-    // ─────────────────────────────────────────────────────────────────────────
-
-    private String buildAugmentedPrompt(String userQuery, List<String> connectorIds, String userEmail) {
+    private String buildAugmentedPrompt(User user, String userQuery, List<String> connectorIds) {
         StringBuilder context = new StringBuilder();
 
-        // Vector search (static knowledge base)
         List<Document> vectorDocs = vectorStoreService.hybridSearch(userQuery,
-                Map.of("user_id", userEmail), 6);
+                Map.of("user_id", user.getEmail()), 6);
         if (!vectorDocs.isEmpty()) {
             context.append("\n## Retrieved Knowledge Base Context\n");
             vectorDocs.forEach(doc -> context.append("- ").append(doc.getText()).append("\n"));
         }
 
-        // Live connector data
-        if (connectorIds != null && !connectorIds.isEmpty()) {
-            connectorIds.forEach(connectorId -> {
-                try {
-                    String liveData = connectorRegistry.query(connectorId, userQuery);
-                    if (liveData != null && !liveData.isBlank()) {
-                        context.append("\n## Live Data from connector [").append(connectorId).append("]\n");
-                        context.append(liveData).append("\n");
-                    }
-                } catch (Exception ex) {
-                    log.warn("Failed to query connector {}: {}", connectorId, ex.getMessage());
-                }
-            });
+        GitHubContextEngineeringService.GitHubContextResult gitHubContext =
+                gitHubContextEngineeringService.buildContext(user.getId(), userQuery, connectorIds);
+        if (gitHubContext.context() != null && !gitHubContext.context().isBlank()) {
+            context.append(gitHubContext.context()).append("\n");
         }
 
-        if (context.isEmpty()) return userQuery;
+        if (connectorIds != null && !connectorIds.isEmpty()) {
+            appendNonGithubLiveConnectorData(context, connectorIds, gitHubContext.usedConnectorIds(), userQuery);
+        }
+
+        if (context.isEmpty()) {
+            return userQuery;
+        }
         return userQuery + "\n\n---\n" + context;
+    }
+
+    private void appendNonGithubLiveConnectorData(StringBuilder context,
+                                                  List<String> connectorIds,
+                                                  Set<String> githubConnectorIds,
+                                                  String userQuery) {
+        for (String connectorId : connectorIds) {
+            if (githubConnectorIds.contains(connectorId)) {
+                continue;
+            }
+            boolean isGitHub = connectorConfigRepository.findById(connectorId)
+                    .map(cfg -> "GITHUB".equalsIgnoreCase(cfg.getConnectorType()))
+                    .orElse(false);
+            if (isGitHub) {
+                continue;
+            }
+
+            try {
+                String liveData = connectorRegistry.query(connectorId, userQuery);
+                if (liveData != null && !liveData.isBlank()) {
+                    context.append("\n## Live Data from connector [").append(connectorId).append("]\n");
+                    context.append(liveData).append("\n");
+                }
+            } catch (Exception ex) {
+                log.warn("Failed to query connector {}: {}", connectorId, ex.getMessage());
+            }
+        }
     }
 
     private Conversation resolveConversation(ChatRequest request, User user) {
@@ -172,9 +176,15 @@ public class ChatService {
     private String buildMetadataJson(AgentOrchestrator.AgentResult result) {
         try {
             Map<String, Object> meta = new HashMap<>();
-            if (result.citations() != null) meta.put("citations", result.citations());
-            if (result.artifacts() != null) meta.put("artifacts", result.artifacts());
-            if (result.toolCalls() != null) meta.put("tool_calls", result.toolCalls());
+            if (result.citations() != null) {
+                meta.put("citations", result.citations());
+            }
+            if (result.artifacts() != null) {
+                meta.put("artifacts", result.artifacts());
+            }
+            if (result.toolCalls() != null) {
+                meta.put("tool_calls", result.toolCalls());
+            }
             return objectMapper.writeValueAsString(meta);
         } catch (Exception e) {
             return "{}";

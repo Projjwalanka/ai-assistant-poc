@@ -4,6 +4,7 @@ import com.bank.aiassistant.model.entity.ConnectorConfig;
 import com.bank.aiassistant.repository.ConnectorConfigRepository;
 import com.bank.aiassistant.repository.UserRepository;
 import com.bank.aiassistant.service.connector.ConnectorCredentialService;
+import com.bank.aiassistant.service.connector.github.GitHubConnectorSyncService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
@@ -36,6 +37,7 @@ public class OAuthController {
     private final ConnectorConfigRepository connectorConfigRepository;
     private final UserRepository userRepository;
     private final ConnectorCredentialService credentialService;
+    private final GitHubConnectorSyncService gitHubConnectorSyncService;
     private final WebClient.Builder webClientBuilder;
     private final ObjectMapper objectMapper;
 
@@ -157,6 +159,9 @@ public class OAuthController {
                     .encryptedCredentials(credentialService.encrypt(tokens))
                     .build();
             ConnectorConfig saved = connectorConfigRepository.save(config);
+            if ("GITHUB".equalsIgnoreCase(oauthState.type())) {
+                gitHubConnectorSyncService.syncConnectorAsync(saved.getId());
+            }
 
             log.info("OAuth connector created: id={} type={} user={}", saved.getId(), oauthState.type(), oauthState.username());
             response.sendRedirect(frontendUrl + "/oauth/callback?success=true&connectorId=" + saved.getId() + "&type=" + oauthState.type());

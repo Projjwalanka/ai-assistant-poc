@@ -6,6 +6,7 @@ import com.bank.aiassistant.repository.ConnectorConfigRepository;
 import com.bank.aiassistant.repository.UserRepository;
 import com.bank.aiassistant.service.connector.ConnectorCredentialService;
 import com.bank.aiassistant.service.connector.ConnectorRegistry;
+import com.bank.aiassistant.service.connector.github.GitHubConnectorSyncService;
 import com.bank.aiassistant.service.connector.spi.ConnectorHealth;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -30,6 +31,7 @@ public class ConnectorController {
     private final ConnectorConfigRepository connectorConfigRepository;
     private final ConnectorCredentialService credentialService;
     private final ConnectorRegistry connectorRegistry;
+    private final GitHubConnectorSyncService gitHubConnectorSyncService;
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
 
@@ -72,6 +74,7 @@ public class ConnectorController {
             catch (Exception ignored) {}
         }
         ConnectorConfig saved = connectorConfigRepository.save(config);
+        triggerGithubSync(saved);
         return ResponseEntity.status(HttpStatus.CREATED).body(toDto(saved));
     }
 
@@ -98,7 +101,9 @@ public class ConnectorController {
                         try { config.setConfig(objectMapper.writeValueAsString(dto.config())); }
                         catch (Exception ignored) {}
                     }
-                    return ResponseEntity.ok(toDto(connectorConfigRepository.save(config)));
+                    ConnectorConfig saved = connectorConfigRepository.save(config);
+                    triggerGithubSync(saved);
+                    return ResponseEntity.ok(toDto(saved));
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -141,5 +146,11 @@ public class ConnectorController {
                 null, // never return credentials
                 configMap, config.isEnabled(), config.isVerified(), config.isReadOnly(),
                 config.getLastSyncAt(), config.getLastError());
+    }
+
+    private void triggerGithubSync(ConnectorConfig config) {
+        if (config != null && "GITHUB".equalsIgnoreCase(config.getConnectorType()) && config.isEnabled()) {
+            gitHubConnectorSyncService.syncConnectorAsync(config.getId());
+        }
     }
 }

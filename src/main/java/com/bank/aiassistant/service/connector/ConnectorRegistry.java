@@ -18,7 +18,7 @@ import java.util.stream.Collectors;
  * Auto-discovery registry for all {@link DataSourceConnector} implementations.
  *
  * <p>Spring auto-injects every {@code @Service} that implements {@link DataSourceConnector}.
- * Adding a new connector is purely additive — no changes to this class required.
+ * Adding a new connector is purely additive; no changes to this class required.
  */
 @Slf4j
 @Service
@@ -28,40 +28,39 @@ public class ConnectorRegistry {
     private final ConnectorConfigRepository configRepository;
 
     public ConnectorRegistry(List<DataSourceConnector> connectorList,
-                              ConnectorConfigRepository configRepository) {
+                             ConnectorConfigRepository configRepository) {
         this.connectors = connectorList.stream()
                 .collect(Collectors.toMap(DataSourceConnector::getType, Function.identity()));
         this.configRepository = configRepository;
         log.info("ConnectorRegistry: registered {} connectors: {}", connectors.size(), connectors.keySet());
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Query (live extraction)
-    // ─────────────────────────────────────────────────────────────────────────
-
     public String query(String connectorConfigId, String naturalLanguageQuery) {
+        List<Map.Entry<String, Map<String, Object>>> results =
+                queryEntries(connectorConfigId, naturalLanguageQuery, 10);
+        if (results.isEmpty()) {
+            return null;
+        }
+
+        return results.stream()
+                .map(Map.Entry::getKey)
+                .collect(Collectors.joining("\n\n---\n\n"));
+    }
+
+    public List<Map.Entry<String, Map<String, Object>>> queryEntries(String connectorConfigId,
+                                                                      String naturalLanguageQuery,
+                                                                      int maxResults) {
         ConnectorConfig config = configRepository.findById(connectorConfigId)
                 .orElseThrow(() -> new RuntimeException("Connector not found: " + connectorConfigId));
 
         if (!config.isEnabled()) {
-            log.warn("Connector {} is disabled — skipping query", connectorConfigId);
-            return null;
+            log.warn("Connector {} is disabled; skipping query", connectorConfigId);
+            return List.of();
         }
 
         DataSourceConnector connector = resolve(config.getConnectorType());
-        List<Map.Entry<String, Map<String, Object>>> results =
-                connector.query(config, naturalLanguageQuery, 10);
-
-        if (results.isEmpty()) return null;
-
-        return results.stream()
-                .map(e -> e.getKey())
-                .collect(Collectors.joining("\n\n---\n\n"));
+        return connector.query(config, naturalLanguageQuery, maxResults);
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Health check
-    // ─────────────────────────────────────────────────────────────────────────
 
     public ConnectorHealth healthCheck(String connectorConfigId) {
         ConnectorConfig config = configRepository.findById(connectorConfigId)
@@ -69,19 +68,11 @@ public class ConnectorRegistry {
         return resolve(config.getConnectorType()).healthCheck(config);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Batch fetch (for ingestion pipeline)
-    // ─────────────────────────────────────────────────────────────────────────
-
     public List<Map.Entry<String, Map<String, Object>>> fetchAll(String connectorConfigId) {
         ConnectorConfig config = configRepository.findById(connectorConfigId)
                 .orElseThrow(() -> new RuntimeException("Connector not found: " + connectorConfigId));
         return resolve(config.getConnectorType()).fetchAll(config);
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Helpers
-    // ─────────────────────────────────────────────────────────────────────────
 
     private DataSourceConnector resolve(String connectorType) {
         ConnectorType type = ConnectorType.valueOf(connectorType.toUpperCase());

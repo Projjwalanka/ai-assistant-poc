@@ -139,6 +139,9 @@ app:
 
   frontend-url: ${FRONTEND_URL:http://localhost:5173}
   server-url: ${SERVER_URL:http://localhost:8080}
+  github:
+    ingestion:
+      refresh-ms: ${GITHUB_REFRESH_MS:1800000}
 
 # ──────────────────────────────────────────────────────
 # OAuth Provider Credentials
