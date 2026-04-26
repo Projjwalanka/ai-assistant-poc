@@ -116,7 +116,7 @@ app:
     refresh-expiration-ms: 604800000 # 7 days
 
   encryption:
-    key: bXlTdXBlclNlY3JldEVuY3J5cHRpb25LZXkxMjM0NTY3OA==
+    key: uFWGEVvtDz2Ye8iqmRVFOmEXSC9khK0NPTWMB6o5usA=   # 32-byte AES-256 key (replace with env var in prod)
 
   chat:
     context-window-messages: 20
@@ -136,6 +136,26 @@ app:
   artifacts:
     output-dir: ${ARTIFACTS_DIR:${java.io.tmpdir}/ai-artifacts}
     base-url: /api/artifacts
+
+  frontend-url: ${FRONTEND_URL:http://localhost:5173}
+  server-url: ${SERVER_URL:http://localhost:8080}
+
+# ──────────────────────────────────────────────────────
+# OAuth Provider Credentials
+# Set these via environment variables or .env before enabling OAuth connectivity.
+# ──────────────────────────────────────────────────────
+oauth:
+  github:
+    client-id: ${GITHUB_CLIENT_ID:}
+    client-secret: ${GITHUB_CLIENT_SECRET:}
+
+  atlassian:
+    client-id: ${ATLASSIAN_CLIENT_ID:}
+    client-secret: ${ATLASSIAN_CLIENT_SECRET:}
+
+  microsoft:
+    client-id: ${MICROSOFT_CLIENT_ID:}
+    client-secret: ${MICROSOFT_CLIENT_SECRET:}
 
 # ──────────────────────────────────────────────────────
 # Actuator

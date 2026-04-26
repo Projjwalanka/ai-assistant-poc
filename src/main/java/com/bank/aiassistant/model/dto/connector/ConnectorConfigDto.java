@@ -13,6 +13,7 @@ public record ConnectorConfigDto(
         Map<String, Object> config,
         boolean enabled,
         boolean verified,
+        boolean readOnly,
         Instant lastSyncAt,
         String lastError
 ) {}

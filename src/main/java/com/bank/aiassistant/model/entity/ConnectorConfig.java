@@ -44,6 +44,10 @@ public class ConnectorConfig {
     @Builder.Default
     private boolean verified = false;
 
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean readOnly = false;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     private User owner;
