@@ -39,7 +39,7 @@ spring:
 
   data:
     mongodb:
-      uri: ${MONGODB_URI:}
+      uri: mongodb+srv://cip_user:VaKr8wHWlEL9YJUn@cluster0.ggbxo0v.mongodb.net/?appName=Cluster0
       auto-index-creation: true
 
   # ──────────────────────────────────────────────────────
@@ -47,7 +47,7 @@ spring:
   # ──────────────────────────────────────────────────────
   ai:
     openai:
-      api-key: ${OPENAI_API_KEY:}
+      api-key: ""
       chat:
         options:
           model: gpt-4o
@@ -64,10 +64,10 @@ spring:
     # Pinecone vector store (managed)
     vectorstore:
       pinecone:
-        api-key: ${PINECONE_API_KEY:}
-        environment: ${PINECONE_ENVIRONMENT:}
-        index-name: ${PINECONE_INDEX_NAME:ai-assistant-index}
-        namespace: ${PINECONE_NAMESPACE:default}
+        api-key: pcsk_3DBsK9_KatqKDtm9jLj7U2oWriNbgrWopN3riyWm463cLZV46PDpwSFDLj7UdMD6hvHeiP
+        environment: ""
+        index-name: ai-assistant-index
+        namespace: default
 
   # ──────────────────────────────────────────────────────
   # Cache (Caffeine L1)
@@ -217,10 +217,6 @@ spring:
 
   datasource:
     url: jdbc:postgresql://localhost:5432/ai_assistant
-
-  ai:
-    openai:
-      api-key: ${OPENAI_API_KEY}   # Must be set in environment or .env
 
 logging:
   level:
