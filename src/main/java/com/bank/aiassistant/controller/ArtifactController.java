@@ -23,12 +23,18 @@ public class ArtifactController {
     @Value("${app.artifacts.output-dir:${java.io.tmpdir}/ai-artifacts}")
     private String outputDir;
 
-    private static final Map<String, String> CONTENT_TYPES = Map.of(
-            "pdf",  "application/pdf",
-            "xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            "json", "application/json",
-            "png",  "image/png",
-            "jpg",  "image/jpeg"
+    private static final Map<String, String> CONTENT_TYPES = Map.ofEntries(
+            Map.entry("pdf",  "application/pdf"),
+            Map.entry("xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+            Map.entry("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+            Map.entry("pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"),
+            Map.entry("json", "application/json"),
+            Map.entry("xml",  "application/xml"),
+            Map.entry("txt",  "text/plain"),
+            Map.entry("html", "text/html"),
+            Map.entry("csv",  "text/csv"),
+            Map.entry("png",  "image/png"),
+            Map.entry("jpg",  "image/jpeg")
     );
 
     @GetMapping("/{filename:.+}")

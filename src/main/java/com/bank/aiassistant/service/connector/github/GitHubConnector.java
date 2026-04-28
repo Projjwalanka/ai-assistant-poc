@@ -133,6 +133,7 @@ public class GitHubConnector implements DataSourceConnector {
                     ));
                 }
 
+                fetchCommits(client, fullName, config.getId(), all);
                 fetchIssues(client, fullName, config.getId(), all);
                 fetchPullRequests(client, fullName, config.getId(), all);
             }
@@ -177,6 +178,43 @@ public class GitHubConnector implements DataSourceConnector {
                     .retrieve().bodyToMono(String.class).block(Duration.ofSeconds(10));
         } catch (Exception e) {
             return null;
+        }
+    }
+
+    private void fetchCommits(WebClient client,
+                              String repoFullName,
+                              String connectorId,
+                              List<Map.Entry<String, Map<String, Object>>> out) {
+        try {
+            String url = "/repos/" + repoFullName + "/commits?per_page=20";
+            JsonNode arr = objectMapper.readTree(get(client, url));
+            if (!arr.isArray()) return;
+            arr.forEach(commit -> {
+                String sha     = commit.path("sha").asText("").substring(0,
+                        Math.min(7, commit.path("sha").asText("").length()));
+                String fullSha = commit.path("sha").asText("");
+                String message = commit.path("commit").path("message").asText("");
+                String author  = commit.path("commit").path("author").path("name").asText("unknown");
+                String date    = commit.path("commit").path("author").path("date").asText("");
+                String htmlUrl = commit.path("html_url").asText(
+                        "https://github.com/" + repoFullName + "/commit/" + fullSha);
+                String text = String.format(
+                        "GitHub Commit %s - %s\nRepository: %s | Author: %s | Date: %s\n\n%s",
+                        sha, message.lines().findFirst().orElse("").trim(),
+                        repoFullName, author, date, truncate(message, BODY_TRUNCATE));
+                Map<String, Object> meta = new java.util.HashMap<>(Map.of(
+                        "source_type", "GITHUB",
+                        "connector_id", connectorId,
+                        "content_type", "commit",
+                        "repo", repoFullName,
+                        "sha", sha,
+                        "url", htmlUrl
+                ));
+                if (!date.isEmpty()) meta.put("updated_at", date);
+                out.add(Map.entry(text, meta));
+            });
+        } catch (Exception e) {
+            log.debug("Failed to fetch commits for {}: {}", repoFullName, e.getMessage());
         }
     }
 

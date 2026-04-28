@@ -139,6 +139,26 @@ public class ConnectorController {
         return ResponseEntity.ok(health);
     }
 
+    @PostMapping("/{id}/sync")
+    public ResponseEntity<Map<String, String>> triggerSync(
+            @PathVariable String id,
+            @AuthenticationPrincipal UserDetails principal) {
+        var user = resolveUser(principal);
+        var config = connectorConfigRepository.findByIdAndOwnerId(id, user.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Connector not found"));
+        if (!"GITHUB".equalsIgnoreCase(config.getConnectorType())) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("message", "Manual sync is only supported for GitHub connectors"));
+        }
+        if (!config.isEnabled()) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("message", "Connector is disabled"));
+        }
+        gitHubConnectorSyncService.syncConnectorAsync(id);
+        return ResponseEntity.accepted()
+                .body(Map.of("message", "Sync started", "connectorId", id));
+    }
+
     private User resolveUser(UserDetails principal) {
         return userRepository.findByEmail(principal.getUsername()).orElseGet(() ->
                 userRepository.save(User.builder()

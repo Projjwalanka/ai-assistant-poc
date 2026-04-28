@@ -116,6 +116,9 @@ app:
     ingestion:
       refresh-ms: ${GITHUB_REFRESH_MS:1800000}
 
+  cdc:
+    poll-interval-ms: ${CDC_POLL_INTERVAL_MS:1800000}  # 30 min fallback poll for connectors without webhooks
+
 # ──────────────────────────────────────────────────────
 # OAuth Provider Credentials
 # Set these via environment variables or .env before enabling OAuth connectivity.

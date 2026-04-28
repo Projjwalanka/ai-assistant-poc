@@ -1,9 +1,12 @@
 package com.bank.aiassistant.service.ingestion;
 
+import com.bank.aiassistant.context.TenantContext;
 import com.bank.aiassistant.model.entity.IngestionDocument;
 import com.bank.aiassistant.model.entity.IngestionJob;
 import com.bank.aiassistant.repository.IngestionDocumentRepository;
 import com.bank.aiassistant.repository.IngestionJobRepository;
+import com.bank.aiassistant.service.kg.CdcSyncService;
+import com.bank.aiassistant.service.kg.EntityExtractionService;
 import com.bank.aiassistant.service.vector.VectorStoreService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +20,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.stream.Collectors;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -30,6 +34,8 @@ public class IngestionPipeline {
     private final VectorStoreService vectorStoreService;
     private final IngestionJobRepository jobRepository;
     private final IngestionDocumentRepository documentRepository;
+    private final EntityExtractionService entityExtractionService;
+    private final CdcSyncService cdcSyncService;
 
     // ─────────────────────────────────────────────────────────────────────────
     // Public API
@@ -41,7 +47,8 @@ public class IngestionPipeline {
                                                  Map<String, Object> extraMeta) {
         IngestionJob job = createJob(connectorId, filename);
 
-        String ownerId = extraMeta != null ? (String) extraMeta.get("user_id") : null;
+        String ownerId   = extraMeta != null ? (String) extraMeta.get("user_id") : null;
+        String tenantId  = TenantContext.fromEmail(ownerId);
         IngestionDocument doc = documentRepository.save(IngestionDocument.builder()
                 .fileName(filename)
                 .fileType(resolveFileType(filename))
@@ -86,6 +93,20 @@ public class IngestionPipeline {
             doc.setStatus(IngestionDocument.DocStatus.COMPLETED);
             doc.setUpdatedAt(Instant.now());
             documentRepository.save(doc);
+
+            // Async KG entity extraction — does not block ingestion completion
+            String rawText = rawDocs.stream()
+                    .map(d -> d.getText() != null ? d.getText() : "")
+                    .collect(java.util.stream.Collectors.joining(" "));
+            entityExtractionService.extractAndStore(
+                    rawText, tenantId,
+                    connectorId != null ? connectorId : "UPLOAD",
+                    filename, "DOCUMENTS");
+
+            // Update CDC checksum for document dedup on re-upload
+            String hash = Integer.toHexString(new String(fileBytes).hashCode());
+            cdcSyncService.getOrCreate(tenantId, connectorId != null ? connectorId : "UPLOAD", "DOCUMENTS");
+            cdcSyncService.updateChecksum(tenantId, connectorId != null ? connectorId : "UPLOAD", filename, hash);
 
             log.info("Ingested '{}': {} chunks stored. jobId={} docId={}", filename, chunks.size(), job.getId(), doc.getId());
             return CompletableFuture.completedFuture(job.getId());
@@ -162,9 +183,10 @@ public class IngestionPipeline {
     // Helpers
     // ─────────────────────────────────────────────────────────────────────────
 
-    private IngestionJob createJob(String connectorType, String sourceRef) {
+    private IngestionJob createJob(String connectorId, String sourceRef) {
         IngestionJob job = IngestionJob.builder()
-                .connectorType(connectorType != null ? connectorType : "UNKNOWN")
+                .connectorType(connectorId != null ? connectorId : "UPLOAD")
+                .connectorId(connectorId)
                 .sourceRef(sourceRef)
                 .status(IngestionJob.JobStatus.PENDING)
                 .build();

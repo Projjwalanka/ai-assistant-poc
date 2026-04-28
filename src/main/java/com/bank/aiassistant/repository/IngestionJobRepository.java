@@ -10,4 +10,6 @@ import java.util.List;
 public interface IngestionJobRepository extends MongoRepository<IngestionJob, String> {
     List<IngestionJob> findByStatusOrderByCreatedAtDesc(IngestionJob.JobStatus status);
     List<IngestionJob> findTop20ByOrderByCreatedAtDesc();
+    List<IngestionJob> findByConnectorIdOrderByCreatedAtDesc(String connectorId);
+    List<IngestionJob> findByConnectorTypeOrderByCreatedAtDesc(String connectorType);
 }

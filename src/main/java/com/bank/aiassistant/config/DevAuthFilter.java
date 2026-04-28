@@ -1,5 +1,6 @@
 package com.bank.aiassistant.config;
 
+import com.bank.aiassistant.context.TenantContext;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -46,6 +47,12 @@ public class DevAuthFilter extends OncePerRequestFilter {
 
             SecurityContextHolder.getContext().setAuthentication(auth);
         }
-        filterChain.doFilter(request, response);
+        // Set tenant context for KG isolation (bank.com derived from admin@bank.com)
+        TenantContext.set(TenantContext.fromEmail(DEV_USER_EMAIL));
+        try {
+            filterChain.doFilter(request, response);
+        } finally {
+            TenantContext.clear();
+        }
     }
 }

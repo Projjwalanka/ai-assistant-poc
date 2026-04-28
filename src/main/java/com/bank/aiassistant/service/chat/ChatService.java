@@ -1,5 +1,6 @@
 package com.bank.aiassistant.service.chat;
 
+import com.bank.aiassistant.context.TenantContext;
 import com.bank.aiassistant.model.dto.chat.ChatRequest;
 import com.bank.aiassistant.model.dto.chat.ChatResponse;
 import com.bank.aiassistant.model.entity.Conversation;
@@ -12,11 +13,11 @@ import com.bank.aiassistant.service.agent.AgentOrchestrator;
 import com.bank.aiassistant.service.connector.ConnectorRegistry;
 import com.bank.aiassistant.service.connector.github.GitHubContextEngineeringService;
 import com.bank.aiassistant.service.guardrails.GuardrailChain;
+import com.bank.aiassistant.service.kg.ContextEngineeringService;
 import com.bank.aiassistant.service.vector.VectorStoreService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.document.Document;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
@@ -52,6 +53,7 @@ public class ChatService {
     private final ObjectMapper objectMapper;
     private final GitHubContextEngineeringService gitHubContextEngineeringService;
     private final ConnectorConfigRepository connectorConfigRepository;
+    private final ContextEngineeringService contextEngineeringService;
 
     @Transactional
     public ChatResponse chat(ChatRequest request, String userEmail) {
@@ -137,27 +139,62 @@ public class ChatService {
     private String buildAugmentedPrompt(User user, String userQuery, List<String> connectorIds) {
         StringBuilder context = new StringBuilder();
 
-        List<Document> vectorDocs = vectorStoreService.hybridSearch(userQuery,
-                Map.of("user_id", user.getEmail()), 6);
-        if (!vectorDocs.isEmpty()) {
-            context.append("\n## Retrieved Knowledge Base Context\n");
-            vectorDocs.forEach(doc -> context.append("- ").append(doc.getText()).append("\n"));
+        // ── Knowledge Graph + Vector context via Context Engineering Engine ──
+        String tenantId = TenantContext.fromEmail(user.getEmail());
+        ContextEngineeringService.EngineeredContext engineered =
+                contextEngineeringService.engineContext(userQuery, tenantId, user.getEmail(), connectorIds);
+
+        if (!engineered.contextBlock().isBlank()) {
+            context.append(engineered.contextBlock()).append("\n");
         }
 
+        // ── Inject active GitHub connector IDs so the LLM can call github_api tool ──
+        List<String> githubConnectorIds = resolveGitHubConnectorIds(user, connectorIds);
+        if (!githubConnectorIds.isEmpty()) {
+            context.append("\n## Active GitHub Connectors (use with github_api tool)\n");
+            connectorConfigRepository.findAllById(githubConnectorIds).forEach(cfg ->
+                    context.append(String.format("- connector_id: `%s`  name: \"%s\"\n",
+                            cfg.getId(), cfg.getName())));
+            context.append("Use the `github_api` tool with one of these connector_ids to fetch real-time GitHub data " +
+                    "(commits, branches, pull requests, issues, workflows, etc.).\n");
+        }
+
+        // ── GitHub-specific deep context (indexed PRs/issues/READMEs) ────────
         GitHubContextEngineeringService.GitHubContextResult gitHubContext =
                 gitHubContextEngineeringService.buildContext(user.getId(), user.getEmail(), userQuery, connectorIds);
         if (gitHubContext.context() != null && !gitHubContext.context().isBlank()) {
             context.append(gitHubContext.context()).append("\n");
         }
 
+        // ── Live connector data (Jira, Confluence, etc.) ─────────────────────
         if (connectorIds != null && !connectorIds.isEmpty()) {
             appendNonGithubLiveConnectorData(context, connectorIds, gitHubContext.usedConnectorIds(), userQuery);
         }
+
+        log.debug("Context engineering: intent={} kgEntities={} vectorDocs={} githubConnectors={} totalChars={}",
+                engineered.detectedIntent(), engineered.kgEntities().size(),
+                engineered.vectorDocuments().size(), githubConnectorIds.size(), context.length());
 
         if (context.isEmpty()) {
             return userQuery;
         }
         return userQuery + "\n\n---\n" + context;
+    }
+
+    private List<String> resolveGitHubConnectorIds(User user, List<String> requestedConnectorIds) {
+        if (requestedConnectorIds != null && !requestedConnectorIds.isEmpty()) {
+            return requestedConnectorIds.stream()
+                    .filter(id -> connectorConfigRepository.findById(id)
+                            .map(cfg -> "GITHUB".equalsIgnoreCase(cfg.getConnectorType())
+                                    && cfg.isEnabled()
+                                    && user.getId().equals(cfg.getOwnerId()))
+                            .orElse(false))
+                    .toList();
+        }
+        return connectorConfigRepository.findByOwnerIdAndConnectorTypeIgnoreCaseAndEnabledTrue(
+                user.getId(), "GITHUB").stream()
+                .map(cfg -> cfg.getId())
+                .toList();
     }
 
     private void appendNonGithubLiveConnectorData(StringBuilder context,

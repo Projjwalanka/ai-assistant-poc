@@ -13,7 +13,4 @@ public interface GithubContentIndexRepository extends MongoRepository<GithubCont
 
     List<GithubContentIndex> findByUserIdAndConnectorIdIn(String userId, List<String> connectorIds);
 
-    long countDistinctRepoByUserIdAndConnectorIdInAndRepoIsNotNullAndRepoNot(String userId,
-                                                                              List<String> connectorIds,
-                                                                              String repo);
 }

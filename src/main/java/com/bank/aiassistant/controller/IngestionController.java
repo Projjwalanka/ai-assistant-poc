@@ -47,7 +47,15 @@ public class IngestionController {
     }
 
     @GetMapping("/jobs")
-    public ResponseEntity<List<IngestionJob>> listJobs() {
+    public ResponseEntity<List<IngestionJob>> listJobs(
+            @RequestParam(required = false) String connectorId,
+            @RequestParam(required = false) String connectorType) {
+        if (connectorId != null && !connectorId.isBlank()) {
+            return ResponseEntity.ok(jobRepository.findByConnectorIdOrderByCreatedAtDesc(connectorId));
+        }
+        if (connectorType != null && !connectorType.isBlank()) {
+            return ResponseEntity.ok(jobRepository.findByConnectorTypeOrderByCreatedAtDesc(connectorType));
+        }
         return ResponseEntity.ok(jobRepository.findTop20ByOrderByCreatedAtDesc());
     }
 

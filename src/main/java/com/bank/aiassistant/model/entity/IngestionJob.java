@@ -15,6 +15,8 @@ public class IngestionJob {
 
     private String connectorType;
 
+    private String connectorId;
+
     private String sourceRef;
 
     @Builder.Default

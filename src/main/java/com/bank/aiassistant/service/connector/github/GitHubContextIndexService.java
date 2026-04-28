@@ -108,7 +108,11 @@ public class GitHubContextIndexService {
         if (connectorIds == null || connectorIds.isEmpty()) {
             return 0;
         }
-        return repository.countDistinctRepoByUserIdAndConnectorIdInAndRepoIsNotNullAndRepoNot(userId, connectorIds, "");
+        return repository.findByUserIdAndConnectorIdIn(userId, connectorIds).stream()
+                .map(GithubContentIndex::getRepo)
+                .filter(r -> r != null && !r.isEmpty())
+                .distinct()
+                .count();
     }
 
     private double score(GithubContentIndex doc, String q) {

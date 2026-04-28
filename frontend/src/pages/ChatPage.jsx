@@ -7,7 +7,7 @@ import ConnectorPanel from '../components/connectors/ConnectorPanel'
 import { getConversations } from '../api/chat'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Bot, MessageSquarePlus, LogOut, Settings, ChevronLeft,
+  Bot, MessageSquarePlus, LogOut, Settings, ChevronLeft, GitBranch,
   ChevronRight, Trash2, MessageSquare, Database
 } from 'lucide-react'
 import { format } from 'date-fns'
@@ -96,7 +96,11 @@ export default function ChatPage() {
                   <p className="text-[10px] text-gray-400 truncate">{user?.email}</p>
                 </div>
               </div>
-              <div className="flex gap-1">
+              <div className="flex gap-1 flex-wrap">
+                <button onClick={() => navigate('/knowledge')}
+                  className="flex-1 flex items-center justify-center gap-1 rounded-lg py-1.5 text-xs text-indigo-600 hover:bg-indigo-50 transition">
+                  <GitBranch className="h-3 w-3" /> Knowledge
+                </button>
                 <button onClick={() => navigate('/settings')}
                   className="flex-1 flex items-center justify-center gap-1 rounded-lg py-1.5 text-xs text-gray-500 hover:bg-gray-100 transition">
                   <Settings className="h-3 w-3" /> Settings

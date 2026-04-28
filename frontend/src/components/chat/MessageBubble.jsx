@@ -1,10 +1,21 @@
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { ThumbsUp, ThumbsDown, Bot, User, Download, FileText, Table2, Image } from 'lucide-react'
+import { ThumbsUp, ThumbsDown, Bot, User, Download, FileText, Table2, Image,
+         Code2, Globe, AlignLeft } from 'lucide-react'
 import { format } from 'date-fns'
 import { useState } from 'react'
 
-const ARTIFACT_ICONS = { PDF: FileText, EXCEL: Table2, IMAGE: Image, JSON: FileText }
+const ARTIFACT_META = {
+  PDF:         { Icon: FileText,     label: 'PDF',        color: 'text-red-600 bg-red-50 border-red-200' },
+  EXCEL:       { Icon: Table2,       label: 'Excel',      color: 'text-green-700 bg-green-50 border-green-200' },
+  WORD:        { Icon: FileText,     label: 'Word',       color: 'text-blue-700 bg-blue-50 border-blue-200' },
+  POWERPOINT:  { Icon: FileText,     label: 'PowerPoint', color: 'text-orange-600 bg-orange-50 border-orange-200' },
+  JSON:        { Icon: Code2,        label: 'JSON',       color: 'text-yellow-700 bg-yellow-50 border-yellow-200' },
+  XML:         { Icon: Code2,        label: 'XML',        color: 'text-purple-700 bg-purple-50 border-purple-200' },
+  HTML:        { Icon: Globe,        label: 'HTML',       color: 'text-indigo-700 bg-indigo-50 border-indigo-200' },
+  TEXT:        { Icon: AlignLeft,    label: 'Text',       color: 'text-gray-700 bg-gray-50 border-gray-200' },
+  IMAGE:       { Icon: Image,        label: 'Image',      color: 'text-pink-600 bg-pink-50 border-pink-200' },
+}
 
 export default function MessageBubble({ message, onFeedback }) {
   const isAssistant = message.role === 'ASSISTANT'
@@ -59,14 +70,15 @@ export default function MessageBubble({ message, onFeedback }) {
         {message.artifacts?.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-2">
             {message.artifacts.map((artifact, i) => {
-              const Icon = ARTIFACT_ICONS[artifact.type] || FileText
+              const meta = ARTIFACT_META[artifact.type] ?? ARTIFACT_META.TEXT
+              const { Icon, label, color } = meta
               return (
                 <a key={i} href={artifact.downloadUrl} download={artifact.filename}
-                   className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50
-                              px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 transition">
+                   className={`inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition hover:opacity-80 ${color}`}>
                   <Icon className="h-3.5 w-3.5" />
-                  {artifact.filename}
-                  <Download className="h-3 w-3 opacity-60" />
+                  <span>{artifact.filename}</span>
+                  <span className="opacity-50 text-[10px] uppercase font-bold">{label}</span>
+                  <Download className="h-3 w-3 opacity-50" />
                 </a>
               )
             })}

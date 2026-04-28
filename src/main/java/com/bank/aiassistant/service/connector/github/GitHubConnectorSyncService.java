@@ -1,7 +1,9 @@
 package com.bank.aiassistant.service.connector.github;
 
 import com.bank.aiassistant.model.entity.ConnectorConfig;
+import com.bank.aiassistant.model.entity.IngestionJob;
 import com.bank.aiassistant.repository.ConnectorConfigRepository;
+import com.bank.aiassistant.repository.IngestionJobRepository;
 import com.bank.aiassistant.service.connector.ConnectorRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +25,7 @@ import java.util.concurrent.locks.ReentrantLock;
 public class GitHubConnectorSyncService {
 
     private final ConnectorConfigRepository connectorConfigRepository;
+    private final IngestionJobRepository jobRepository;
     private final ConnectorRegistry connectorRegistry;
     private final GitHubContextIndexService contextIndexService;
 
@@ -34,7 +37,6 @@ public class GitHubConnectorSyncService {
         syncConnector(connectorId);
     }
 
-    @Transactional
     public boolean syncConnector(String connectorId) {
         ReentrantLock lock = connectorLocks.computeIfAbsent(connectorId, id -> new ReentrantLock());
         if (!lock.tryLock()) {
@@ -42,25 +44,46 @@ public class GitHubConnectorSyncService {
             return false;
         }
         ConnectorConfig config = connectorConfigRepository.findById(connectorId).orElse(null);
-        try {
-            if (config == null || !config.isEnabled() || !"GITHUB".equalsIgnoreCase(config.getConnectorType())) {
-                return false;
-            }
+        if (config == null || !config.isEnabled() || !"GITHUB".equalsIgnoreCase(config.getConnectorType())) {
+            lock.unlock();
+            return false;
+        }
 
-            try {
-                List<Map.Entry<String, Map<String, Object>>> docs = connectorRegistry.fetchAll(connectorId);
-                contextIndexService.replaceConnectorCorpus(config, docs);
-                config.setLastSyncAt(Instant.now());
-                config.setLastError(null);
-                connectorConfigRepository.save(config);
-                log.info("GitHub connector sync complete: connectorId={} docs={}", connectorId, docs.size());
-                return true;
-            } catch (Exception ex) {
-                config.setLastError(truncate(ex.getMessage(), 500));
-                connectorConfigRepository.save(config);
-                log.error("GitHub connector sync failed: connectorId={} error={}", connectorId, ex.getMessage(), ex);
-                return false;
-            }
+        IngestionJob job = jobRepository.save(IngestionJob.builder()
+                .connectorType("GITHUB")
+                .connectorId(connectorId)
+                .sourceRef(config.getName() != null ? config.getName() : connectorId)
+                .status(IngestionJob.JobStatus.RUNNING)
+                .startedAt(Instant.now())
+                .build());
+
+        try {
+            List<Map.Entry<String, Map<String, Object>>> docs = connectorRegistry.fetchAll(connectorId);
+            contextIndexService.replaceConnectorCorpus(config, docs);
+
+            config.setLastSyncAt(Instant.now());
+            config.setLastError(null);
+            connectorConfigRepository.save(config);
+
+            job.setStatus(IngestionJob.JobStatus.COMPLETED);
+            job.setChunksTotal(docs.size());
+            job.setChunksProcessed(docs.size());
+            job.setCompletedAt(Instant.now());
+            jobRepository.save(job);
+
+            log.info("GitHub connector sync complete: connectorId={} docs={}", connectorId, docs.size());
+            return true;
+        } catch (Exception ex) {
+            config.setLastError(truncate(ex.getMessage(), 500));
+            connectorConfigRepository.save(config);
+
+            job.setStatus(IngestionJob.JobStatus.FAILED);
+            job.setErrorMessage(truncate(ex.getMessage(), 500));
+            job.setCompletedAt(Instant.now());
+            jobRepository.save(job);
+
+            log.error("GitHub connector sync failed: connectorId={} error={}", connectorId, ex.getMessage(), ex);
+            return false;
         } finally {
             lock.unlock();
         }

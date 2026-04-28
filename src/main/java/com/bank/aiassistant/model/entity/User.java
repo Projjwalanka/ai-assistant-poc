@@ -35,6 +35,12 @@ public class User {
     @Builder.Default
     private boolean locked = false;
 
+    /**
+     * Derived from email domain on first login/registration.
+     * E.g. admin@bank.com → bank.com. Used for multi-tenant KG isolation.
+     */
+    private String tenantId;
+
     @Builder.Default
     private Instant createdAt = Instant.now();
 

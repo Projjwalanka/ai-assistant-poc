@@ -69,6 +69,7 @@ export default function DataSourceDetailModal({ connector, onClose, onEdit, onDe
   const [testing, setTesting] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [syncing, setSyncing] = useState(false)
   const [deletingDocId, setDeletingDocId] = useState(null)
   const fileInputRef = useRef(null)
 
@@ -79,11 +80,11 @@ export default function DataSourceDetailModal({ connector, onClose, onEdit, onDe
   const loadJobs = useCallback(async () => {
     setLoadingJobs(true)
     try {
-      const { data } = await client.get('/ingestion/jobs')
-      setJobs(data.filter(j => j.connectorType === connector.connectorType))
+      const { data } = await client.get(`/ingestion/jobs?connectorId=${connector.id}`)
+      setJobs(data)
     } catch { /* silent */ }
     finally { setLoadingJobs(false) }
-  }, [connector.connectorType])
+  }, [connector.id])
 
   const loadDocuments = useCallback(async () => {
     if (!isDocuments) return
@@ -112,6 +113,17 @@ export default function DataSourceDetailModal({ connector, onClose, onEdit, onDe
       )
     } catch { toast.error('Health check failed') }
     finally { setTesting(false) }
+  }
+
+  const handleSyncNow = async () => {
+    setSyncing(true)
+    try {
+      await client.post(`/connectors/${connector.id}/sync`)
+      toast.success('Sync started — check back in a moment')
+      setTimeout(() => loadJobs(), 2000)
+      setTimeout(() => loadJobs(), 8000)
+    } catch { toast.error('Failed to start sync') }
+    finally { setSyncing(false) }
   }
 
   const handleDelete = async () => {
@@ -164,6 +176,7 @@ export default function DataSourceDetailModal({ connector, onClose, onEdit, onDe
   }
 
   const completedJobs = jobs.filter(j => j.status === 'COMPLETED')
+  const isGitHub = connector.connectorType === 'GITHUB'
   const totalChunks = isDocuments
     ? documents.filter(d => d.status === 'COMPLETED').reduce((s, d) => s + (d.chunksCount ?? 0), 0)
     : completedJobs.reduce((sum, j) => sum + (j.chunksProcessed ?? 0), 0)
@@ -224,11 +237,11 @@ export default function DataSourceDetailModal({ connector, onClose, onEdit, onDe
               <p className="text-2xl font-bold text-gray-900">
                 {isDocuments ? documents.filter(d => d.status === 'COMPLETED').length : completedJobs.length}
               </p>
-              <p className="text-[10px] text-gray-400 mt-0.5">{isDocuments ? 'Indexed Docs' : 'Sync Jobs'}</p>
+              <p className="text-[10px] text-gray-400 mt-0.5">{isDocuments ? 'Indexed Docs' : 'Completed Syncs'}</p>
             </div>
             <div className="py-4 text-center">
               <p className="text-2xl font-bold text-gray-900">{totalChunks.toLocaleString()}</p>
-              <p className="text-[10px] text-gray-400 mt-0.5">Chunks Indexed</p>
+              <p className="text-[10px] text-gray-400 mt-0.5">{isGitHub ? 'Items Indexed' : 'Chunks Indexed'}</p>
             </div>
             <div className="py-4 text-center">
               <p className={`text-2xl font-bold ${failedCount > 0 ? 'text-red-600' : 'text-gray-900'}`}>
@@ -392,6 +405,16 @@ export default function DataSourceDetailModal({ connector, onClose, onEdit, onDe
               <Zap className="h-3.5 w-3.5 text-blue-500" />
               {testing ? 'Testing…' : 'Test Connection'}
             </button>
+            {!isDocuments && isGitHub && (
+              <button
+                onClick={handleSyncNow}
+                disabled={syncing}
+                className="flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3.5 py-2 text-xs font-medium text-indigo-700 hover:bg-indigo-100 transition disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${syncing ? 'animate-spin' : ''}`} />
+                {syncing ? 'Syncing…' : 'Sync Now'}
+              </button>
+            )}
             <button
               onClick={() => onEdit(connector)}
               className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 transition"
