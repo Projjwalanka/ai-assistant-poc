@@ -74,6 +74,7 @@ function TypeSelector({ onSelect }) {
 
 function ConfigForm({ type, connector, onSaved }) {
   const isEdit = !!connector
+  const isDocuments = type === 'DOCUMENTS'
   const meta = CONNECTOR_META[type] ?? {}
   const Icon = meta.Icon
   const fields = CREDENTIAL_FIELDS[type] ?? []
@@ -382,4 +383,3 @@ export default function ConnectorConfigModal({ connector, onClose, onSaved }) {
     </AnimatePresence>
   )
 }
-  const isDocuments = type === 'DOCUMENTS'
