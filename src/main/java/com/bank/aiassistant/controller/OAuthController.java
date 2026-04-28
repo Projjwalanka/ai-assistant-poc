@@ -1,6 +1,8 @@
 package com.bank.aiassistant.controller;
 
 import com.bank.aiassistant.model.entity.ConnectorConfig;
+import com.bank.aiassistant.model.entity.Role;
+import com.bank.aiassistant.model.entity.User;
 import com.bank.aiassistant.repository.ConnectorConfigRepository;
 import com.bank.aiassistant.repository.UserRepository;
 import com.bank.aiassistant.service.connector.ConnectorCredentialService;
@@ -25,6 +27,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -148,7 +151,7 @@ public class OAuthController {
             String callbackUri = serverUrl + "/api/connectors/oauth/callback";
             Map<String, String> tokens = exchangeCodeForToken(oauthState.type(), code, callbackUri);
 
-            var user = userRepository.findByEmail(oauthState.username()).orElseThrow();
+            var user = resolveUserByEmail(oauthState.username());
             ConnectorConfig config = ConnectorConfig.builder()
                     .connectorType(oauthState.type())
                     .name(oauthState.name())
@@ -263,5 +266,18 @@ public class OAuthController {
     private String encode(String value) {
         if (value == null || value.isBlank()) return "";
         return URLEncoder.encode(value, StandardCharsets.UTF_8);
+    }
+
+    private User resolveUserByEmail(String email) {
+        return userRepository.findByEmail(email).orElseGet(() ->
+                userRepository.save(User.builder()
+                        .email(email)
+                        .password("")
+                        .firstName("Dev")
+                        .lastName("User")
+                        .roles(Set.of(Role.USER))
+                        .enabled(true)
+                        .locked(false)
+                        .build()));
     }
 }

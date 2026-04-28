@@ -269,7 +269,7 @@ export default function DataSourceDetailModal({ connector, onClose, onEdit, onDe
                   className="flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3.5 py-2 text-xs font-medium text-blue-700 hover:bg-blue-100 transition disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <FileText className="h-3.5 w-3.5" />
-                  {uploading ? 'Uploading…' : 'Upload Document'}
+                  {uploading ? 'Uploading…' : 'Browse Files'}
                 </button>
               </>
             )}

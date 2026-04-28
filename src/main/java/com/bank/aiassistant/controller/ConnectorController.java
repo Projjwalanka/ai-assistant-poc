@@ -2,6 +2,8 @@ package com.bank.aiassistant.controller;
 
 import com.bank.aiassistant.model.dto.connector.ConnectorConfigDto;
 import com.bank.aiassistant.model.entity.ConnectorConfig;
+import com.bank.aiassistant.model.entity.Role;
+import com.bank.aiassistant.model.entity.User;
 import com.bank.aiassistant.repository.ConnectorConfigRepository;
 import com.bank.aiassistant.repository.UserRepository;
 import com.bank.aiassistant.service.connector.ConnectorCredentialService;
@@ -22,6 +24,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/connectors")
@@ -38,7 +41,7 @@ public class ConnectorController {
     @GetMapping
     public ResponseEntity<List<ConnectorConfigDto>> listConnectors(
             @AuthenticationPrincipal UserDetails principal) {
-        var user = userRepository.findByEmail(principal.getUsername()).orElseThrow();
+        var user = resolveUser(principal);
         var configs = connectorConfigRepository.findByOwnerId(user.getId());
         return ResponseEntity.ok(configs.stream().map(this::toDto).toList());
     }
@@ -47,7 +50,7 @@ public class ConnectorController {
     public ResponseEntity<ConnectorConfigDto> getConnector(
             @PathVariable String id,
             @AuthenticationPrincipal UserDetails principal) {
-        var user = userRepository.findByEmail(principal.getUsername()).orElseThrow();
+        var user = resolveUser(principal);
         return connectorConfigRepository.findByIdAndOwnerId(id, user.getId())
                 .map(c -> ResponseEntity.ok(toDto(c)))
                 .orElse(ResponseEntity.notFound().build());
@@ -58,7 +61,7 @@ public class ConnectorController {
     public ResponseEntity<ConnectorConfigDto> createConnector(
             @Valid @RequestBody ConnectorConfigDto dto,
             @AuthenticationPrincipal UserDetails principal) {
-        var user = userRepository.findByEmail(principal.getUsername()).orElseThrow();
+        var user = resolveUser(principal);
         ConnectorConfig config = ConnectorConfig.builder()
                 .connectorType(dto.connectorType())
                 .name(dto.name())
@@ -84,7 +87,7 @@ public class ConnectorController {
             @PathVariable String id,
             @Valid @RequestBody ConnectorConfigDto dto,
             @AuthenticationPrincipal UserDetails principal) {
-        var user = userRepository.findByEmail(principal.getUsername()).orElseThrow();
+        var user = resolveUser(principal);
         return connectorConfigRepository.findByIdAndOwnerId(id, user.getId())
                 .map(config -> {
                     if (config.isReadOnly() && dto.credentials() != null && !dto.credentials().isEmpty()) {
@@ -113,7 +116,7 @@ public class ConnectorController {
     public ResponseEntity<Void> deleteConnector(
             @PathVariable String id,
             @AuthenticationPrincipal UserDetails principal) {
-        var user = userRepository.findByEmail(principal.getUsername()).orElseThrow();
+        var user = resolveUser(principal);
         connectorConfigRepository.findByIdAndOwnerId(id, user.getId())
                 .ifPresent(config -> {
                     if (config.isReadOnly()) {
@@ -129,11 +132,24 @@ public class ConnectorController {
     public ResponseEntity<ConnectorHealth> healthCheck(
             @PathVariable String id,
             @AuthenticationPrincipal UserDetails principal) {
-        var user = userRepository.findByEmail(principal.getUsername()).orElseThrow();
+        var user = resolveUser(principal);
         connectorConfigRepository.findByIdAndOwnerId(id, user.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Connector not found"));
         ConnectorHealth health = connectorRegistry.healthCheck(id);
         return ResponseEntity.ok(health);
+    }
+
+    private User resolveUser(UserDetails principal) {
+        return userRepository.findByEmail(principal.getUsername()).orElseGet(() ->
+                userRepository.save(User.builder()
+                        .email(principal.getUsername())
+                        .password("")
+                        .firstName("Dev")
+                        .lastName("User")
+                        .roles(Set.of(Role.USER))
+                        .enabled(true)
+                        .locked(false)
+                        .build()));
     }
 
     private ConnectorConfigDto toDto(ConnectorConfig config) {
