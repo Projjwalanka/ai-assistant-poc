@@ -7,15 +7,15 @@ spring:
   # ──────────────────────────────────────────────────────
   data:
     mongodb:
-      uri: mongodb+srv://cip_user:VaKr8wHWlEL9YJUn@cluster0.ggbxo0v.mongodb.net/cip_database?appName=Cluster0
-      auto-index-creation: true
+      uri: mongodb+srv://cip_user:cip_password@cluster0.ggbxo0v.mongodb.net/cip_db?authSource=admin&retryWrites=true&w=majority&appName=Cluster0
+      auto-index-creation: true  
 
   # ──────────────────────────────────────────────────────
   # Spring AI — OpenAI
   # ──────────────────────────────────────────────────────
   ai:
     openai:
-      api-key: ""
+      api-key: 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
       chat:
         options:
           model: gpt-4o
