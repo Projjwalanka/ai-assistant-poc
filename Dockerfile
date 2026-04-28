@@ -26,8 +26,7 @@ COPY src ./src
 COPY frontend ./frontend
 
 # Build (Maven builds React then packages everything)
-RUN --mount=type=cache,target=/root/.m2 \
-    --mount=type=cache,target=/build/target/node \
+RUN --mount=type=cache,target=/root/.m2 \    
     mvn clean package -DskipTests -B --no-transfer-progress
 
 # ── Stage 2: Runtime ─────────────────────────────────────────────────────────
