@@ -92,7 +92,7 @@ function ConfigForm({ type, connector, onSaved }) {
     if (!name.trim()) { toast.error('Enter a display name first'); return }
     setOauthStatus('pending')
     try {
-      const params = new URLSearchParams({ type, name: name.trim(), readOnly: String(readOnly) })
+      const params = new URLSearchParams({ type, name: name.trim(), readOnly: String(isDocuments ? false : readOnly) })
       const { data } = await client.get(`/connectors/oauth/initiate?${params}`)
 
       // Backend returns {error, message} when provider credentials are not configured
@@ -144,7 +144,7 @@ function ConfigForm({ type, connector, onSaved }) {
     if (!name.trim()) { toast.error('Display name is required'); return }
     setSaving(true)
     try {
-      const payload = { connectorType: type, name: name.trim(), credentials, enabled: true, readOnly }
+      const payload = { connectorType: type, name: name.trim(), credentials, enabled: true, readOnly: isDocuments ? false : readOnly }
       if (isEdit) {
         await client.put(`/connectors/${connector.id}`, payload)
         toast.success('Connector updated')
@@ -200,27 +200,28 @@ function ConfigForm({ type, connector, onSaved }) {
           />
         </div>
 
-        {/* Read Only toggle */}
-        <div className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-3.5 py-3">
-          <div className="flex items-center gap-2.5">
-            <Lock className="h-4 w-4 text-amber-500 flex-shrink-0" />
-            <div>
-              <p className="text-xs font-semibold text-gray-800">Read Only</p>
-              <p className="text-[10px] text-gray-400">Block all write operations to this source</p>
+        {!isDocuments && (
+          <div className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-3.5 py-3">
+            <div className="flex items-center gap-2.5">
+              <Lock className="h-4 w-4 text-amber-500 flex-shrink-0" />
+              <div>
+                <p className="text-xs font-semibold text-gray-800">Read Only</p>
+                <p className="text-[10px] text-gray-400">Block all write operations to this source</p>
+              </div>
             </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={readOnly}
+              onClick={() => setReadOnly(r => !r)}
+              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors
+                ${readOnly ? 'bg-amber-500' : 'bg-gray-200'}`}
+            >
+              <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transition-transform
+                ${readOnly ? 'translate-x-4' : 'translate-x-0'}`} />
+            </button>
           </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={readOnly}
-            onClick={() => setReadOnly(r => !r)}
-            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors
-              ${readOnly ? 'bg-amber-500' : 'bg-gray-200'}`}
-          >
-            <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transition-transform
-              ${readOnly ? 'translate-x-4' : 'translate-x-0'}`} />
-          </button>
-        </div>
+        )}
 
         {/* OAuth section (for supported types) */}
         {meta.supportsOAuth && !isEdit && (
@@ -381,3 +382,4 @@ export default function ConnectorConfigModal({ connector, onClose, onSaved }) {
     </AnimatePresence>
   )
 }
+  const isDocuments = type === 'DOCUMENTS'

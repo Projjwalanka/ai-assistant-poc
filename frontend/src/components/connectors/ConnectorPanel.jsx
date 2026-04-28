@@ -105,7 +105,7 @@ export default function ConnectorPanel() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1">
                     <p className="text-xs font-semibold text-gray-800 truncate">{connector.name}</p>
-                    {connector.readOnly && (
+                    {connector.readOnly && connector.connectorType !== 'DOCUMENTS' && (
                       <Lock className="h-3 w-3 text-amber-500 flex-shrink-0" title="Read Only — writes blocked" />
                     )}
                   </div>

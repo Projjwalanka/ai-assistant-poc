@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   X, Trash2, Settings, RefreshCw, Lock, CheckCircle2, XCircle,
@@ -31,6 +31,8 @@ export default function DataSourceDetailModal({ connector, onClose, onEdit, onDe
   const [loadingJobs, setLoadingJobs] = useState(false)
   const [testing, setTesting] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef(null)
 
   const meta = CONNECTOR_META[connector.connectorType] ?? { label: connector.connectorType, bg: 'bg-gray-100' }
   const Icon = meta.Icon
@@ -58,7 +60,7 @@ export default function DataSourceDetailModal({ connector, onClose, onEdit, onDe
   }
 
   const handleDelete = async () => {
-    if (connector.readOnly) { toast.error('Cannot delete a Read Only data source'); return }
+    if (connector.readOnly && connector.connectorType !== 'DOCUMENTS') { toast.error('Cannot delete a Read Only data source'); return }
     if (!window.confirm(`Remove "${connector.name}"? This cannot be undone.`)) return
     setDeleting(true)
     try {
@@ -72,6 +74,27 @@ export default function DataSourceDetailModal({ connector, onClose, onEdit, onDe
   const completedJobs = jobs.filter(j => j.status === 'COMPLETED')
   const totalChunks = completedJobs.reduce((sum, j) => sum + (j.chunksProcessed ?? 0), 0)
   const failedJobs = jobs.filter(j => j.status === 'FAILED').length
+  const isDocuments = connector.connectorType === 'DOCUMENTS'
+
+  const handleDocumentUpload = async (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      await client.post('/ingestion/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      toast.success(`"${file.name}" uploaded and queued for ingestion`)
+      loadJobs()
+    } catch {
+      toast.error('Document upload failed')
+    } finally {
+      setUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
 
   return (
     <AnimatePresence>
@@ -90,7 +113,7 @@ export default function DataSourceDetailModal({ connector, onClose, onEdit, onDe
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-base font-bold text-gray-900">{connector.name}</h2>
-                {connector.readOnly && (
+                {connector.readOnly && !isDocuments && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
                     <Lock className="h-2.5 w-2.5" /> Read Only
                   </span>
@@ -224,13 +247,32 @@ export default function DataSourceDetailModal({ connector, onClose, onEdit, onDe
             <div className="flex-1" />
             <button
               onClick={handleDelete}
-              disabled={deleting || connector.readOnly}
-              title={connector.readOnly ? 'Cannot remove a Read Only source' : 'Remove this data source'}
+              disabled={deleting || (connector.readOnly && !isDocuments)}
+              title={connector.readOnly && !isDocuments ? 'Cannot remove a Read Only source' : 'Remove this data source'}
               className="flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2 text-xs font-medium text-red-600 hover:bg-red-100 transition disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Trash2 className="h-3.5 w-3.5" />
               {deleting ? 'Removing…' : 'Remove'}
             </button>
+            {isDocuments && (
+              <>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.md,.csv"
+                  onChange={handleDocumentUpload}
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3.5 py-2 text-xs font-medium text-blue-700 hover:bg-blue-100 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  {uploading ? 'Uploading…' : 'Upload Document'}
+                </button>
+              </>
+            )}
           </div>
         </motion.div>
       </div>
