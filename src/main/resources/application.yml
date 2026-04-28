@@ -37,12 +37,17 @@ spring:
     baseline-version: 0
     validate-on-migrate: false   # DEV: skip checksum validation (V2 was edited after apply)
 
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:}
+      auto-index-creation: true
+
   # ──────────────────────────────────────────────────────
   # Spring AI — OpenAI
   # ──────────────────────────────────────────────────────
   ai:
     openai:
-      api-key: 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  # <-- Replace or set env var
+      api-key: ${OPENAI_API_KEY:}
       chat:
         options:
           model: gpt-4o
@@ -56,13 +61,13 @@ spring:
         options:
           model: dall-e-3
 
-    # pgvector store
+    # Pinecone vector store (managed)
     vectorstore:
-      pgvector:
-        index-type: HNSW
-        distance-type: COSINE_DISTANCE
-        dimensions: 1536             # Must match embedding model output
-        initialize-schema: false     # Flyway (V2) owns the vector_store schema
+      pinecone:
+        api-key: ${PINECONE_API_KEY:}
+        environment: ${PINECONE_ENVIRONMENT:}
+        index-name: ${PINECONE_INDEX_NAME:ai-assistant-index}
+        namespace: ${PINECONE_NAMESPACE:default}
 
   # ──────────────────────────────────────────────────────
   # Cache (Caffeine L1)
@@ -221,3 +226,4 @@ logging:
   level:
     com.bank.aiassistant: DEBUG
     org.springframework.ai: DEBUG
+

@@ -117,6 +117,14 @@ public class GitHubContextIndexService {
         return hits;
     }
 
+    @Transactional(readOnly = true)
+    public long countDistinctRepos(String userId, List<String> connectorIds) {
+        if (connectorIds == null || connectorIds.isEmpty()) {
+            return 0;
+        }
+        return repository.countDistinctRepos(userId, connectorIds);
+    }
+
     private String deriveTitle(String body, String sourceType) {
         if (body == null || body.isBlank()) {
             return sourceType.toUpperCase() + " item";

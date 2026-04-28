@@ -13,6 +13,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 @Slf4j
@@ -26,6 +27,38 @@ public class GitHubContextEngineeringService {
     private final ConnectorRegistry connectorRegistry;
 
     public record GitHubContextResult(String context, Set<String> usedConnectorIds) {}
+
+    public Optional<String> tryDirectAnswer(String userId,
+                                            String userEmail,
+                                            String userQuery,
+                                            List<String> requestedConnectorIds) {
+        if (!isRepoCountQuestion(userQuery)) {
+            return Optional.empty();
+        }
+        List<ConnectorConfig> scopedConnectors = resolveScope(userId, userEmail, userQuery, requestedConnectorIds);
+        if (scopedConnectors.isEmpty()) {
+            return Optional.of("I could not find an enabled GitHub connector for your account.");
+        }
+
+        Set<String> connectorIds = scopedConnectors.stream()
+                .map(ConnectorConfig::getId)
+                .collect(LinkedHashSet::new, Set::add, Set::addAll);
+
+        for (ConnectorConfig connector : scopedConnectors) {
+            syncService.syncIfStale(connector);
+        }
+
+        long repoCount = contextIndexService.countDistinctRepos(userId, List.copyOf(connectorIds));
+        if (repoCount == 0) {
+            // Force one fresh sync attempt to answer count-style questions reliably.
+            for (ConnectorConfig connector : scopedConnectors) {
+                syncService.syncConnector(connector.getId());
+            }
+            repoCount = contextIndexService.countDistinctRepos(userId, List.copyOf(connectorIds));
+        }
+
+        return Optional.of("Connected GitHub repositories available for this account: " + repoCount + ".");
+    }
 
     public GitHubContextResult buildContext(String userId,
                                             String userEmail,
@@ -174,6 +207,17 @@ public class GitHubContextEngineeringService {
                 || q.contains("pull request") || q.contains("pr ")
                 || q.contains("issue") || q.contains("commit") || q.contains("branch")
                 || q.contains("workflow") || q.contains("actions") || q.contains("code");
+    }
+
+    private boolean isRepoCountQuestion(String query) {
+        if (query == null) {
+            return false;
+        }
+        String q = query.toLowerCase();
+        boolean asksCount = q.contains("how many") || q.contains("count") || q.contains("number of");
+        boolean asksReposOrProjects = q.contains("repo") || q.contains("repository") || q.contains("project");
+        boolean asksGithub = q.contains("github") || q.contains("connected");
+        return asksCount && asksReposOrProjects && asksGithub;
     }
 
     private String keyOf(RankedHit hit) {

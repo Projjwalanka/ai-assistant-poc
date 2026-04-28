@@ -25,6 +25,7 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -61,6 +62,27 @@ public class ChatService {
         Conversation conversation = resolveConversation(request, user);
         memoryService.saveUserMessage(conversation, sanitizedInput);
 
+        Optional<String> directGitHubAnswer = gitHubContextEngineeringService.tryDirectAnswer(
+                user.getId(), user.getEmail(), sanitizedInput, request.connectorIds());
+        if (directGitHubAnswer.isPresent()) {
+            String safeOutput = guardrailChain.checkOutput(directGitHubAnswer.get(), userEmail);
+            Message assistantMessage = memoryService.saveAssistantMessage(
+                    conversation, safeOutput, "direct-github-answer", null,
+                    System.currentTimeMillis() - start, "{}");
+            return new ChatResponse(
+                    assistantMessage.getId(),
+                    conversation.getId(),
+                    safeOutput,
+                    List.of(),
+                    List.of(),
+                    "direct-github-answer",
+                    null,
+                    null,
+                    System.currentTimeMillis() - start,
+                    Instant.now()
+            );
+        }
+
         String augmentedPrompt = buildAugmentedPrompt(user, sanitizedInput, request.connectorIds());
         var messages = memoryService.buildContext(conversation.getId(), augmentedPrompt, null);
 
@@ -95,6 +117,15 @@ public class ChatService {
         String sanitizedInput = guardrailChain.checkInput(request.message(), userEmail);
         Conversation conversation = resolveConversation(request, user);
         memoryService.saveUserMessage(conversation, sanitizedInput);
+
+        Optional<String> directGitHubAnswer = gitHubContextEngineeringService.tryDirectAnswer(
+                user.getId(), user.getEmail(), sanitizedInput, request.connectorIds());
+        if (directGitHubAnswer.isPresent()) {
+            String safeOutput = guardrailChain.checkOutput(directGitHubAnswer.get(), userEmail);
+            memoryService.saveAssistantMessage(
+                    conversation, safeOutput, "direct-github-answer", null, 0L, "{}");
+            return Flux.just(safeOutput);
+        }
 
         String augmentedPrompt = buildAugmentedPrompt(user, sanitizedInput, request.connectorIds());
         var messages = memoryService.buildContext(conversation.getId(), augmentedPrompt, null);

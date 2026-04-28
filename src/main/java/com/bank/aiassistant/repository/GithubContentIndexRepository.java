@@ -49,4 +49,15 @@ public interface GithubContentIndexRepository extends JpaRepository<GithubConten
                                 @Param("connectorIds") List<String> connectorIds,
                                 @Param("query") String query,
                                 @Param("limit") int limit);
+
+    @Query(value = """
+            SELECT COUNT(DISTINCT g.repo)
+            FROM github_content_index g
+            WHERE g.user_id = :userId
+              AND g.connector_id IN (:connectorIds)
+              AND g.repo IS NOT NULL
+              AND g.repo <> ''
+            """, nativeQuery = true)
+    long countDistinctRepos(@Param("userId") String userId,
+                            @Param("connectorIds") List<String> connectorIds);
 }
