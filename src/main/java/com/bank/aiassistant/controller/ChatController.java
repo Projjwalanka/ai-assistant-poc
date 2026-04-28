@@ -4,6 +4,7 @@ import com.bank.aiassistant.model.dto.chat.ChatRequest;
 import com.bank.aiassistant.model.dto.chat.ChatResponse;
 import com.bank.aiassistant.model.entity.Conversation;
 import com.bank.aiassistant.repository.ConversationRepository;
+import com.bank.aiassistant.repository.UserRepository;
 import com.bank.aiassistant.service.chat.ChatService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -25,10 +26,8 @@ public class ChatController {
 
     private final ChatService chatService;
     private final ConversationRepository conversationRepository;
+    private final UserRepository userRepository;
 
-    /**
-     * Blocking chat endpoint — returns full response.
-     */
     @PostMapping
     public ResponseEntity<ChatResponse> chat(
             @Valid @RequestBody ChatRequest request,
@@ -37,10 +36,6 @@ public class ChatController {
         return ResponseEntity.ok(response);
     }
 
-    /**
-     * Streaming chat endpoint — Server-Sent Events for real-time token streaming.
-     * Client connects with Accept: text/event-stream.
-     */
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> chatStream(
             @Valid @RequestBody ChatRequest request,
@@ -48,9 +43,6 @@ public class ChatController {
         return chatService.chatStream(request, principal.getUsername());
     }
 
-    /**
-     * List conversations for the authenticated user.
-     */
     @GetMapping("/conversations")
     public ResponseEntity<Page<Conversation>> listConversations(
             @AuthenticationPrincipal UserDetails principal,
@@ -60,9 +52,6 @@ public class ChatController {
                 conversationRepository.findByUserIdAndArchivedFalseOrderByUpdatedAtDesc(userId, pageable));
     }
 
-    /**
-     * Get a single conversation with its messages.
-     */
     @GetMapping("/conversations/{id}")
     public ResponseEntity<Conversation> getConversation(
             @PathVariable String id,
@@ -73,9 +62,6 @@ public class ChatController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    /**
-     * Archive (soft-delete) a conversation.
-     */
     @DeleteMapping("/conversations/{id}")
     public ResponseEntity<Void> archiveConversation(
             @PathVariable String id,
@@ -89,8 +75,6 @@ public class ChatController {
     }
 
     private String getUserId(String email) {
-        // Fetched via UserRepository in a real implementation
-        // Simplified for controller — actual lookup happens in ChatService
-        return email;
+        return userRepository.findByEmail(email).map(u -> u.getId()).orElse(email);
     }
 }

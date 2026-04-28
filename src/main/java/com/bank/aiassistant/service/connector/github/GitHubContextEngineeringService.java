@@ -109,7 +109,7 @@ public class GitHubContextEngineeringService {
             for (String id : requestedConnectorIds) {
                 connectorConfigRepository.findById(id).ifPresent(cfg -> {
                     if (cfg.isEnabled() && "GITHUB".equalsIgnoreCase(cfg.getConnectorType())
-                            && cfg.getOwner() != null && userId.equals(cfg.getOwner().getId())) {
+                            && userId.equals(cfg.getOwnerId())) {
                         selected.add(cfg);
                     }
                 });

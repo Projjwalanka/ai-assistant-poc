@@ -1,69 +1,48 @@
 package com.bank.aiassistant.model.entity;
 
-import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.annotations.UpdateTimestamp;
-import org.hibernate.type.SqlTypes;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
 
-/**
- * Persisted configuration for a data source connector.
- * Credentials are AES-256 encrypted at rest (see ConnectorCredentialService).
- */
-@Entity
-@Table(name = "connector_configs", uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"user_id", "connector_type", "name"})
-})
+@Document(collection = "connector_configs")
+@CompoundIndex(name = "owner_type_name_unique", def = "{'ownerId': 1, 'connectorType': 1, 'name': 1}", unique = true)
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class ConnectorConfig {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
 
-    @Column(nullable = false, length = 50)
-    private String connectorType;   // JIRA, CONFLUENCE, GITHUB, SHAREPOINT, EMAIL, DOCUMENTS
+    private String connectorType;
 
-    @Column(nullable = false, length = 100)
-    private String name;            // human-readable label (e.g. "Acme JIRA")
+    private String name;
 
-    /** Encrypted JSON blob: { "baseUrl": "...", "token": "...", ... } */
-    @Column(columnDefinition = "TEXT")
     private String encryptedCredentials;
 
-    /** Non-sensitive config JSON: { "projectKeys": [...], "maxResults": 50 } */
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(columnDefinition = "JSONB")
     private String config;
 
-    @Column(nullable = false)
     @Builder.Default
     private boolean enabled = false;
 
-    @Column(nullable = false)
     @Builder.Default
     private boolean verified = false;
 
-    @Column(nullable = false)
     @Builder.Default
     private boolean readOnly = false;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id")
-    private User owner;
+    private String ownerId;
+
+    private String ownerEmail;
 
     private Instant lastSyncAt;
 
-    @Column(length = 500)
     private String lastError;
 
-    @CreationTimestamp
-    @Column(nullable = false, updatable = false)
-    private Instant createdAt;
+    @Builder.Default
+    private Instant createdAt = Instant.now();
 
-    @UpdateTimestamp
-    private Instant updatedAt;
+    @Builder.Default
+    private Instant updatedAt = Instant.now();
 }

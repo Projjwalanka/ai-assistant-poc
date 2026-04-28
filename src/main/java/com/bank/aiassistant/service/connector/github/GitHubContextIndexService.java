@@ -3,7 +3,6 @@ package com.bank.aiassistant.service.connector.github;
 import com.bank.aiassistant.model.entity.ConnectorConfig;
 import com.bank.aiassistant.model.entity.GithubContentIndex;
 import com.bank.aiassistant.repository.GithubContentIndexRepository;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -15,6 +14,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -22,7 +22,6 @@ import java.util.Map;
 public class GitHubContextIndexService {
 
     private final GithubContentIndexRepository repository;
-    private final ObjectMapper objectMapper;
 
     public record IndexedHit(
             String connectorId,
@@ -39,13 +38,10 @@ public class GitHubContextIndexService {
     public void replaceConnectorCorpus(ConnectorConfig connector,
                                        List<Map.Entry<String, Map<String, Object>>> documents) {
         repository.deleteByConnectorId(connector.getId());
-        // Important: flush delete first so unique (connector_id, url) does not collide with previous corpus rows.
-        repository.flush();
         if (documents == null || documents.isEmpty()) {
             return;
         }
 
-        // Ensure uniqueness by URL before insert, matching DB unique constraint (connector_id, url).
         Map<String, GithubContentIndex> byUrl = new LinkedHashMap<>();
         for (Map.Entry<String, Map<String, Object>> entry : documents) {
             Map<String, Object> meta = entry.getValue() != null ? new HashMap<>(entry.getValue()) : new HashMap<>();
@@ -61,7 +57,7 @@ public class GitHubContextIndexService {
 
             GithubContentIndex candidate = GithubContentIndex.builder()
                     .connectorId(connector.getId())
-                    .userId(connector.getOwner().getId())
+                    .userId(connector.getOwnerId())
                     .sourceType(sourceType)
                     .repo(asString(meta.get("repo")))
                     .url(url)
@@ -78,7 +74,6 @@ public class GitHubContextIndexService {
         }
         List<GithubContentIndex> entities = new ArrayList<>(byUrl.values());
         repository.saveAll(entities);
-        repository.flush();
         log.info("GitHub index refreshed for connector={} inputDocs={} uniqueDocs={}",
                 connector.getId(), documents.size(), entities.size());
     }
@@ -88,33 +83,24 @@ public class GitHubContextIndexService {
         if (connectorIds == null || connectorIds.isEmpty()) {
             return List.of();
         }
-        List<Object[]> rows = repository.searchRanked(userId, connectorIds, query, limit);
-        List<IndexedHit> hits = new ArrayList<>(rows.size());
-        for (Object[] row : rows) {
-            Map<String, Object> metadata = new HashMap<>();
-            try {
-                Object raw = row[8];
-                if (raw != null) {
-                    if (raw instanceof Map<?, ?> mapValue) {
-                        metadata = objectMapper.convertValue(mapValue, Map.class);
-                    } else {
-                        metadata = objectMapper.readValue(raw.toString(), Map.class);
-                    }
-                }
-            } catch (Exception ignored) {
-            }
-            hits.add(new IndexedHit(
-                    row[1] != null ? row[1].toString() : null,
-                    row[3] != null ? row[3].toString() : "unknown",
-                    row[4] != null ? row[4].toString() : null,
-                    row[5] != null ? row[5].toString() : null,
-                    row[6] != null ? row[6].toString() : null,
-                    row[7] != null ? row[7].toString() : "",
-                    metadata,
-                    row[11] != null ? Double.parseDouble(row[11].toString()) : 0.0
-            ));
-        }
-        return hits;
+
+        List<GithubContentIndex> docs = repository.findByUserIdAndConnectorIdIn(userId, connectorIds);
+        String q = query == null ? "" : query.toLowerCase();
+        return docs.stream()
+                .map(doc -> new IndexedHit(
+                        doc.getConnectorId(),
+                        doc.getSourceType(),
+                        doc.getRepo(),
+                        doc.getUrl(),
+                        doc.getTitle(),
+                        doc.getBody(),
+                        doc.getMetadata(),
+                        score(doc, q)
+                ))
+                .filter(hit -> hit.score() > 0)
+                .sorted((a, b) -> Double.compare(b.score(), a.score()))
+                .limit(limit)
+                .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
@@ -122,7 +108,30 @@ public class GitHubContextIndexService {
         if (connectorIds == null || connectorIds.isEmpty()) {
             return 0;
         }
-        return repository.countDistinctRepos(userId, connectorIds);
+        return repository.countDistinctRepoByUserIdAndConnectorIdInAndRepoIsNotNullAndRepoNot(userId, connectorIds, "");
+    }
+
+    private double score(GithubContentIndex doc, String q) {
+        if (q == null || q.isBlank()) {
+            return 0;
+        }
+        String title = doc.getTitle() == null ? "" : doc.getTitle().toLowerCase();
+        String body = doc.getBody() == null ? "" : doc.getBody().toLowerCase();
+        String repo = doc.getRepo() == null ? "" : doc.getRepo().toLowerCase();
+
+        double score = 0;
+        if (title.contains(q)) score += 5.0;
+        if (repo.contains(q)) score += 4.0;
+        if (body.contains(q)) score += 3.0;
+
+        String[] tokens = q.split("\\s+");
+        for (String token : tokens) {
+            if (token.length() < 2) continue;
+            if (title.contains(token)) score += 1.5;
+            if (repo.contains(token)) score += 1.2;
+            if (body.contains(token)) score += 0.8;
+        }
+        return score;
     }
 
     private String deriveTitle(String body, String sourceType) {

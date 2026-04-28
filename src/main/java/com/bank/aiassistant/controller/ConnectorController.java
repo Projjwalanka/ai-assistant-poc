@@ -62,7 +62,8 @@ public class ConnectorController {
         ConnectorConfig config = ConnectorConfig.builder()
                 .connectorType(dto.connectorType())
                 .name(dto.name())
-                .owner(user)
+                .ownerId(user.getId())
+                .ownerEmail(user.getEmail())
                 .enabled(dto.enabled())
                 .readOnly(dto.readOnly())
                 .build();

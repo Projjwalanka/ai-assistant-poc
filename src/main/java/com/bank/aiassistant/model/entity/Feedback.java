@@ -1,44 +1,32 @@
 package com.bank.aiassistant.model.entity;
 
-import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
 
-@Entity
-@Table(name = "feedback")
+@Document(collection = "feedback")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class Feedback {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
 
-    @Column(nullable = false)
     private String messageId;
-
-    @Column(nullable = false)
     private String conversationId;
-
-    @Column(nullable = false)
     private String userId;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 10)
-    private FeedbackType type;  // THUMBS_UP, THUMBS_DOWN, RATING
+    private FeedbackType type;
 
-    private Integer rating;    // 1–5, used when type=RATING
+    private Integer rating;
 
-    @Column(columnDefinition = "TEXT")
     private String comment;
 
-    @Column(length = 50)
-    private String category;   // WRONG_ANSWER, HALLUCINATION, INAPPROPRIATE, HELPFUL, etc.
+    private String category;
 
-    @CreationTimestamp
-    @Column(nullable = false, updatable = false)
-    private Instant createdAt;
+    @Builder.Default
+    private Instant createdAt = Instant.now();
 
     public enum FeedbackType {
         THUMBS_UP, THUMBS_DOWN, RATING

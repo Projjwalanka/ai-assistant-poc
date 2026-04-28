@@ -12,7 +12,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * <p>Architecture overview:
  * <ul>
  *   <li>Spring AI 1.0 + GPT-4o for LLM orchestration</li>
- *   <li>pgvector for hybrid RAG (dense + sparse retrieval)</li>
+ *   <li>Pinecone for vector retrieval and MongoDB for application persistence</li>
  *   <li>MCP-based secure connector framework for Jira, Confluence, GitHub, SharePoint, Email</li>
  *   <li>ReAct agentic loop with tool execution (PDF, Excel, Email, Image, JSON)</li>
  *   <li>Multi-layer guardrails (PII, toxicity, prompt-injection, data-leakage)</li>

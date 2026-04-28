@@ -1,20 +1,42 @@
 package com.bank.aiassistant.repository;
 
 import com.bank.aiassistant.model.entity.Feedback;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.mongodb.repository.Aggregation;
+import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
 @Repository
-public interface FeedbackRepository extends JpaRepository<Feedback, String> {
+public interface FeedbackRepository extends MongoRepository<Feedback, String> {
 
     List<Feedback> findByConversationId(String conversationId);
 
-    @Query("SELECT f.category, COUNT(f) FROM Feedback f GROUP BY f.category")
-    List<Object[]> countByCategory();
+    @Aggregation(pipeline = {
+            "{ $group: { _id: '$category', count: { $sum: 1 } } }"
+    })
+    List<CategoryCount> countByCategory();
 
-    @Query("SELECT AVG(f.rating) FROM Feedback f WHERE f.rating IS NOT NULL")
-    Double averageRating();
+    @Aggregation(pipeline = {
+            "{ $match: { rating: { $ne: null } } }",
+            "{ $group: { _id: null, avg: { $avg: '$rating' } } }"
+    })
+    List<AverageRating> averageRatingRaw();
+
+    default Double averageRating() {
+        List<AverageRating> values = averageRatingRaw();
+        if (values == null || values.isEmpty()) {
+            return null;
+        }
+        return values.get(0).getAvg();
+    }
+
+    interface CategoryCount {
+        String getId();
+        long getCount();
+    }
+
+    interface AverageRating {
+        Double getAvg();
+    }
 }

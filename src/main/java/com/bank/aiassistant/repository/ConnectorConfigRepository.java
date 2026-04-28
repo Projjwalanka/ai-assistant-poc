@@ -1,14 +1,14 @@
 package com.bank.aiassistant.repository;
 
 import com.bank.aiassistant.model.entity.ConnectorConfig;
-import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface ConnectorConfigRepository extends JpaRepository<ConnectorConfig, String> {
+public interface ConnectorConfigRepository extends MongoRepository<ConnectorConfig, String> {
 
     List<ConnectorConfig> findByOwnerIdAndEnabledTrue(String ownerId);
 

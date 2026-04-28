@@ -84,7 +84,7 @@ public class ConversationMemoryService {
     @Transactional
     public Message saveUserMessage(Conversation conversation, String content) {
         Message msg = Message.builder()
-                .conversation(conversation)
+                .conversationId(conversation.getId())
                 .role(Message.MessageRole.USER)
                 .content(content)
                 .build();
@@ -96,7 +96,7 @@ public class ConversationMemoryService {
                                          String model, Integer tokens, Long latencyMs,
                                          String metadataJson) {
         Message msg = Message.builder()
-                .conversation(conversation)
+                .conversationId(conversation.getId())
                 .role(Message.MessageRole.ASSISTANT)
                 .content(content)
                 .model(model)

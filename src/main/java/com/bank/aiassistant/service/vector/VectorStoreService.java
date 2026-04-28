@@ -12,13 +12,13 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Abstraction over the Spring AI {@link VectorStore} (pgvector backend).
+ * Abstraction over the Spring AI {@link VectorStore} (Pinecone backend).
  *
  * <p>Implements a <b>hybrid retrieval</b> strategy:
  * <ol>
- *   <li>Dense (semantic) retrieval via pgvector cosine similarity</li>
- *   <li>Sparse (keyword / BM25-like) retrieval via PostgreSQL trigram index</li>
- *   <li>Reciprocal Rank Fusion (RRF) to merge both result lists</li>
+ *   <li>Dense (semantic) retrieval via Pinecone similarity search</li>
+ *   <li>Metadata filtering for user and connector scoping</li>
+ *   <li>Stable rank-fusion helper retained for future hybrid extensions</li>
  * </ol>
  *
  * <p>Metadata filter keys supported:
@@ -91,9 +91,7 @@ public class VectorStoreService {
 
         List<Document> denseResults = vectorStore.similaritySearch(builder.build());
 
-        // ── 2. Sparse (trigram / keyword) retrieval — query via JdbcTemplate ─
-        //    Implemented in SparseSearchService; here we just use dense for POC.
-        //    TODO: wire SparseSearchService for production-grade hybrid.
+        // ── 2. Sparse retrieval hook (not used in current Mongo + Pinecone stack) ─
 
         // ── 3. RRF merge ─────────────────────────────────────────────────────
         List<Document> merged = reciprocalRankFusion(denseResults, List.of(), topK);

@@ -193,7 +193,7 @@ public class ChatService {
                     .orElseThrow(() -> new RuntimeException("Conversation not found: " + request.conversationId()));
         }
         Conversation newConv = Conversation.builder()
-                .user(user)
+                .userId(user.getId())
                 .title(memoryService.generateTitle(request.message()))
                 .build();
         return conversationRepository.save(newConv);
