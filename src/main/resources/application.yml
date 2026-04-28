@@ -7,7 +7,7 @@ spring:
   # ──────────────────────────────────────────────────────
   data:
     mongodb:
-      uri: mongodb+srv://cip_user:VaKr8wHWlEL9YJUn@cluster0.ggbxo0v.mongodb.net/?appName=Cluster0
+      uri: mongodb+srv://cip_user:VaKr8wHWlEL9YJUn@cluster0.ggbxo0v.mongodb.net/ai_assistant?appName=Cluster0
       auto-index-creation: true
 
   # ──────────────────────────────────────────────────────
