@@ -15,7 +15,7 @@ spring:
   # ──────────────────────────────────────────────────────
   ai:
     openai:
-      api-key: ${OPENAI_API_KEY}
+      api-key: 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
       chat:
         options:
           model: gpt-4o
@@ -32,7 +32,7 @@ spring:
     # Pinecone vector store (managed)
     vectorstore:
       pinecone:
-        api-key: ${PINECONE_API_KEY}
+        api-key: pcsk_36My3o_867uHPV6tMj8X4NcTnpGkwfYjYUNEeHuekgAG1tGXXDg6QJ3Q3Ym73HAvMHuegP
         environment: ""
         index-name: cip
         namespace: default

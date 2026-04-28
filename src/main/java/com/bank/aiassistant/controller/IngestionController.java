@@ -1,11 +1,13 @@
 package com.bank.aiassistant.controller;
 
+import com.bank.aiassistant.model.entity.IngestionDocument;
 import com.bank.aiassistant.model.entity.IngestionJob;
+import com.bank.aiassistant.repository.IngestionDocumentRepository;
 import com.bank.aiassistant.repository.IngestionJobRepository;
 import com.bank.aiassistant.service.ingestion.IngestionPipeline;
+import com.bank.aiassistant.service.vector.VectorStoreService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
@@ -22,11 +24,9 @@ public class IngestionController {
 
     private final IngestionPipeline ingestionPipeline;
     private final IngestionJobRepository jobRepository;
+    private final IngestionDocumentRepository documentRepository;
+    private final VectorStoreService vectorStoreService;
 
-    /**
-     * Upload one or more files for ingestion into the vector store.
-     * Supports: PDF, DOCX, XLSX, TXT, HTML, MD
-     */
     @PostMapping("/upload")
     public ResponseEntity<Map<String, String>> uploadFile(
             @RequestParam("file") MultipartFile file,
@@ -40,26 +40,39 @@ public class IngestionController {
         CompletableFuture<String> future = ingestionPipeline.ingestFile(
                 file.getBytes(), file.getOriginalFilename(), connectorId, meta);
 
-        // Return immediately with job ID — client polls /api/ingestion/jobs/{id}
-        return ResponseEntity.accepted().body(Map.of("message", "Ingestion started",
-                "filename", file.getOriginalFilename() != null ? file.getOriginalFilename() : "unknown"));
+        return ResponseEntity.accepted().body(Map.of(
+                "message", "Ingestion started",
+                "filename", file.getOriginalFilename() != null ? file.getOriginalFilename() : "unknown"
+        ));
     }
 
-    /**
-     * List recent ingestion jobs.
-     */
     @GetMapping("/jobs")
     public ResponseEntity<List<IngestionJob>> listJobs() {
         return ResponseEntity.ok(jobRepository.findTop20ByOrderByCreatedAtDesc());
     }
 
-    /**
-     * Get a specific ingestion job status.
-     */
     @GetMapping("/jobs/{id}")
     public ResponseEntity<IngestionJob> getJob(@PathVariable String id) {
         return jobRepository.findById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/documents")
+    public ResponseEntity<List<IngestionDocument>> listDocuments(
+            @RequestParam String connectorId) {
+        return ResponseEntity.ok(
+                documentRepository.findByConnectorIdOrderByUploadedAtDesc(connectorId));
+    }
+
+    @DeleteMapping("/documents/{id}")
+    public ResponseEntity<Void> deleteDocument(@PathVariable String id) {
+        return documentRepository.findById(id).map(doc -> {
+            if (doc.getVectorIds() != null && !doc.getVectorIds().isEmpty()) {
+                vectorStoreService.delete(doc.getVectorIds());
+            }
+            documentRepository.deleteById(id);
+            return ResponseEntity.noContent().<Void>build();
+        }).orElse(ResponseEntity.notFound().build());
     }
 }

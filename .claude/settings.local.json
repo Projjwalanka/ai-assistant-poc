@@ -17,7 +17,13 @@
       "Bash(mvn exec:java -Dexec.mainClass=com.bank.aiassistant.security.jwt.JwtAuthenticationFilter)",
       "Bash(python3 -c \"import base64, os; key = os.urandom\\(32\\); print\\(base64.b64encode\\(key\\).decode\\(\\)\\)\")",
       "Bash(node -e \"const crypto=require\\('crypto'\\); console.log\\(crypto.randomBytes\\(32\\).toString\\('base64'\\)\\)\")",
-      "Bash(node -e \"const k='uFWGEVvtDz2Ye8iqmRVFOmEXSC9khK0NPTWMB6o5usA='; const b=Buffer.from\\(k,'base64'\\); console.log\\('Decoded bytes:', b.length, '\\(must be 16, 24, or 32 for AES\\)'\\)\")"
+      "Bash(node -e \"const k='uFWGEVvtDz2Ye8iqmRVFOmEXSC9khK0NPTWMB6o5usA='; const b=Buffer.from\\(k,'base64'\\); console.log\\('Decoded bytes:', b.length, '\\(must be 16, 24, or 32 for AES\\)'\\)\")",
+      "Bash(git add *)",
+      "Bash(git rm *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(git commit *)",
+      "Bash(gh pr create --title 'fix\\(config\\): update Pinecone vector index name to cip' --body ' *)"
     ]
   }
 }
