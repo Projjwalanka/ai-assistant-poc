@@ -12,7 +12,7 @@ import java.util.List;
 @Repository
 public interface GithubContentIndexRepository extends JpaRepository<GithubContentIndex, String> {
 
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     void deleteByConnectorId(String connectorId);
 
     @Query(value = """

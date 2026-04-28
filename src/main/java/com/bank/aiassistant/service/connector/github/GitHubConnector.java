@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.net.URLEncoder;
@@ -38,6 +39,7 @@ public class GitHubConnector implements DataSourceConnector {
     private static final int MAX_REPOS = 30;
     private static final int README_TRUNCATE = 8000;
     private static final int BODY_TRUNCATE = 3500;
+    private static final int WEBCLIENT_MAX_IN_MEMORY_BYTES = 4 * 1024 * 1024;
 
     @Override
     public ConnectorType getType() {
@@ -393,8 +395,12 @@ public class GitHubConnector implements DataSourceConnector {
 
     private WebClient buildClient(Map<String, String> creds) {
         String token = creds.getOrDefault("accessToken", creds.getOrDefault("personalAccessToken", ""));
+        ExchangeStrategies strategies = ExchangeStrategies.builder()
+                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(WEBCLIENT_MAX_IN_MEMORY_BYTES))
+                .build();
         return WebClient.builder()
                 .baseUrl(GITHUB_API)
+                .exchangeStrategies(strategies)
                 .defaultHeader("Authorization", "Bearer " + token)
                 .defaultHeader("Accept", "application/vnd.github+json")
                 .defaultHeader("X-GitHub-Api-Version", "2022-11-28")

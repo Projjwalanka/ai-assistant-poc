@@ -39,6 +39,8 @@ public class GitHubContextIndexService {
     public void replaceConnectorCorpus(ConnectorConfig connector,
                                        List<Map.Entry<String, Map<String, Object>>> documents) {
         repository.deleteByConnectorId(connector.getId());
+        // Important: flush delete first so unique (connector_id, url) does not collide with previous corpus rows.
+        repository.flush();
         if (documents == null || documents.isEmpty()) {
             return;
         }
@@ -76,6 +78,9 @@ public class GitHubContextIndexService {
         }
         List<GithubContentIndex> entities = new ArrayList<>(byUrl.values());
         repository.saveAll(entities);
+        repository.flush();
+        log.info("GitHub index refreshed for connector={} inputDocs={} uniqueDocs={}",
+                connector.getId(), documents.size(), entities.size());
     }
 
     @Transactional(readOnly = true)
