@@ -18,7 +18,7 @@ RUN apt-get update && \
 
 # Cache Maven dependencies first
 COPY pom.xml .
-RUN --mount=type=cache,target=/root/.m2 \
+RUN --mount=type=cache,id=s/eef67c6c-758c-4547-9eb0-2a04a021b775-/root/.m2,target=/root/.m2 \
     mvn dependency:go-offline -B --no-transfer-progress 2>/dev/null || true
 
 # Copy source
@@ -26,7 +26,7 @@ COPY src ./src
 COPY frontend ./frontend
 
 # Build (Maven builds React then packages everything)
-RUN --mount=type=cache,target=/root/.m2 \    
+RUN --mount=type=cache,id=s/eef67c6c-758c-4547-9eb0-2a04a021b775-/root/.m2,target=/root/.m2 \
     mvn clean package -DskipTests -B --no-transfer-progress
 
 # ── Stage 2: Runtime ─────────────────────────────────────────────────────────
