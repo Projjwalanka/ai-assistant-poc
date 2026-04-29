@@ -25,12 +25,6 @@ const CREDENTIAL_FIELDS = {
     { key: 'clientId',     label: 'Client ID' },
     { key: 'clientSecret', label: 'Client Secret', secret: true },
   ],
-  EMAIL: [
-    { key: 'imapHost', label: 'IMAP Host' },
-    { key: 'imapPort', label: 'IMAP Port', placeholder: '993' },
-    { key: 'username', label: 'Username / Email' },
-    { key: 'password', label: 'Password', secret: true },
-  ],
   DOCUMENTS: [],
 }
 

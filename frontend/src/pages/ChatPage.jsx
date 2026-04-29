@@ -4,7 +4,7 @@ import { useAuthStore } from '../store/authStore'
 import { useChatStore } from '../store/chatStore'
 import ChatInterface from '../components/chat/ChatInterface'
 import ConnectorPanel from '../components/connectors/ConnectorPanel'
-import { getConversations } from '../api/chat'
+import { getConversations, getConversation } from '../api/chat'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Bot, MessageSquarePlus, LogOut, Settings, ChevronLeft, GitBranch,
@@ -16,7 +16,7 @@ import toast from 'react-hot-toast'
 export default function ChatPage() {
   const { user, logout } = useAuthStore()
   const { conversations, currentConversationId, isSidebarOpen,
-          setConversations, setCurrentConversation, reset, toggleSidebar } = useChatStore()
+          setConversations, setCurrentConversation, setMessages, reset, toggleSidebar } = useChatStore()
   const [showConnectors, setShowConnectors] = useState(false)
   const navigate = useNavigate()
 
@@ -30,6 +30,16 @@ export default function ChatPage() {
   }
 
   const startNewChat = () => reset()
+
+  const handleSelectConversation = async (id) => {
+    setCurrentConversation(id)
+    try {
+      const { data } = await getConversation(id)
+      setMessages(data.messages || [])
+    } catch {
+      toast.error('Failed to load conversation')
+    }
+  }
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">
@@ -49,8 +59,8 @@ export default function ChatPage() {
                 <Bot className="h-4.5 w-4.5 text-white h-5 w-5" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-gray-800">AI Assistant</p>
-                <p className="text-[10px] text-gray-400">Enterprise Banking POC</p>
+                <p className="text-sm font-semibold text-gray-800">Context Integration Platform</p>
+                <p className="text-[10px] text-gray-400">US Bank</p>
               </div>
             </div>
 
@@ -70,7 +80,7 @@ export default function ChatPage() {
               <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Recent</p>
               {conversations.map(conv => (
                 <button key={conv.id}
-                  onClick={() => setCurrentConversation(conv.id)}
+                  onClick={() => handleSelectConversation(conv.id)}
                   className={`flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition
                     ${currentConversationId === conv.id
                       ? 'bg-blue-50 text-blue-700'

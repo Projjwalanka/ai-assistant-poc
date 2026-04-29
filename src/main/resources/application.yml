@@ -107,7 +107,7 @@ app:
       requests-per-minute: 20
 
   artifacts:
-    output-dir: ${ARTIFACTS_DIR:${java.io.tmpdir}/ai-artifacts}
+    output-dir: ${ARTIFACTS_DIR:./downloads}
     base-url: /api/artifacts
 
   frontend-url: ${FRONTEND_URL:http://localhost:5173}

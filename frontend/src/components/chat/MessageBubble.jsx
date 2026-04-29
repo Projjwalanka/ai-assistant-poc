@@ -1,9 +1,31 @@
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { ThumbsUp, ThumbsDown, Bot, User, Download, FileText, Table2, Image,
-         Code2, Globe, AlignLeft } from 'lucide-react'
+         Code2, Globe, AlignLeft, Loader2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { useState } from 'react'
+import toast from 'react-hot-toast'
+
+async function downloadArtifact(url, filename) {
+  const token = localStorage.getItem('auth_token')
+  try {
+    const res = await fetch(url, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+    if (!res.ok) throw new Error(`Download failed: ${res.status}`)
+    const blob = await res.blob()
+    const objectUrl = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = objectUrl
+    anchor.download = filename
+    document.body.appendChild(anchor)
+    anchor.click()
+    document.body.removeChild(anchor)
+    URL.revokeObjectURL(objectUrl)
+  } catch (err) {
+    toast.error('Download failed: ' + err.message)
+  }
+}
 
 const ARTIFACT_META = {
   PDF:         { Icon: FileText,     label: 'PDF',        color: 'text-red-600 bg-red-50 border-red-200' },
@@ -20,6 +42,7 @@ const ARTIFACT_META = {
 export default function MessageBubble({ message, onFeedback }) {
   const isAssistant = message.role === 'ASSISTANT'
   const [feedbackGiven, setFeedbackGiven] = useState(null)
+  const [downloading, setDownloading] = useState({})
 
   const handleFeedback = (type) => {
     if (feedbackGiven) return
@@ -72,14 +95,26 @@ export default function MessageBubble({ message, onFeedback }) {
             {message.artifacts.map((artifact, i) => {
               const meta = ARTIFACT_META[artifact.type] ?? ARTIFACT_META.TEXT
               const { Icon, label, color } = meta
+              const isDownloading = !!downloading[i]
               return (
-                <a key={i} href={artifact.downloadUrl} download={artifact.filename}
-                   className={`inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition hover:opacity-80 ${color}`}>
+                <button
+                  key={i}
+                  disabled={isDownloading}
+                  onClick={async () => {
+                    setDownloading(d => ({ ...d, [i]: true }))
+                    await downloadArtifact(artifact.downloadUrl, artifact.filename)
+                    setDownloading(d => ({ ...d, [i]: false }))
+                  }}
+                  className={`inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition hover:opacity-80 disabled:opacity-60 disabled:cursor-not-allowed ${color}`}
+                >
                   <Icon className="h-3.5 w-3.5" />
                   <span>{artifact.filename}</span>
                   <span className="opacity-50 text-[10px] uppercase font-bold">{label}</span>
-                  <Download className="h-3 w-3 opacity-50" />
-                </a>
+                  {isDownloading
+                    ? <Loader2 className="h-3 w-3 opacity-50 animate-spin" />
+                    : <Download className="h-3 w-3 opacity-50" />
+                  }
+                </button>
               )
             })}
           </div>

@@ -91,14 +91,6 @@ export const CONNECTOR_META = {
     oauthProvider: 'Microsoft',
     description: 'Sites, libraries & team documents',
   },
-  EMAIL: {
-    label: 'Email (IMAP)',
-    Icon: EmailIcon,
-    bg: 'bg-purple-50',
-    supportsOAuth: false,
-    oauthProvider: null,
-    description: 'Connect mailbox via IMAP protocol',
-  },
   DOCUMENTS: {
     label: 'Documents',
     Icon: DocumentsIcon,

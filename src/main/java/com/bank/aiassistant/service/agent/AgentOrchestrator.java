@@ -136,18 +136,23 @@ public class AgentOrchestrator {
     // ─────────────────────────────────────────────────────────────────────────
 
     public Flux<String> runStream(List<Message> messages, String conversationId) {
-        List<Message> context = new ArrayList<>(messages);
-        injectToolPrompt(context);
-        // For streaming, we use the blocking agent for tool resolution
-        // then stream the final answer. This is a pragmatic trade-off for a POC.
         return Flux.create(sink -> {
             try {
                 AgentResult result = run(messages, conversationId);
-                // Stream character by character for demo effect
+                // Stream content in chunks for demo effect
                 String content = result.content();
                 for (int i = 0; i < content.length(); i += 10) {
                     int end = Math.min(i + 10, content.length());
                     sink.next(content.substring(i, end));
+                }
+                // Emit artifact metadata as a special trailing event
+                if (result.artifacts() != null && !result.artifacts().isEmpty()) {
+                    try {
+                        String artifactJson = "[ARTIFACTS]" + objectMapper.writeValueAsString(result.artifacts());
+                        sink.next(artifactJson);
+                    } catch (Exception e) {
+                        log.warn("Failed to serialize artifacts for stream: {}", e.getMessage());
+                    }
                 }
                 sink.complete();
             } catch (Exception ex) {

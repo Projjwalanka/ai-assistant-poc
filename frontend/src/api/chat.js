@@ -15,7 +15,7 @@ export const submitFeedback = (data) => client.post('/feedback', data)
  * Streaming chat via SSE — returns an EventSource-compatible fetch stream.
  * Calls the /api/chat/stream endpoint and yields chunks to the onChunk callback.
  */
-export async function sendMessageStream({ message, conversationId, connectorIds }, onChunk, onDone, onError) {
+export async function sendMessageStream({ message, conversationId, connectorIds }, onChunk, onDone, onError, onArtifacts) {
   const token = localStorage.getItem('auth_token')
   try {
     const response = await fetch('/api/chat/stream', {
@@ -50,6 +50,10 @@ export async function sendMessageStream({ message, conversationId, connectorIds 
         if (line.startsWith('data:')) {
           const text = line.slice(5) // strip 'data:' prefix
           if (text === '[DONE]') { onDone(); return }
+          if (text.startsWith('[ARTIFACTS]')) {
+            try { onArtifacts?.(JSON.parse(text.slice(11))) } catch {}
+            continue
+          }
           onChunk(text)
         }
       }

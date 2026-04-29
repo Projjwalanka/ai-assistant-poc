@@ -36,7 +36,7 @@ export default function ChatInterface() {
     }
 
     let fullContent = ''
-    let convId = currentConversationId
+    let streamedArtifacts = []
 
     sendMessageStream(
       request,
@@ -49,16 +49,17 @@ export default function ChatInterface() {
           id: Date.now().toString() + '_ai',
           role: 'ASSISTANT',
           content: fullContent,
+          artifacts: streamedArtifacts,
           createdAt: new Date().toISOString(),
-        }
-        if (!convId) {
-          // First message in new conversation — get ID from response header or next call
         }
         finalizeStream(assistantMessage)
       },
       (err) => {
         setStreaming(false)
         toast.error('Failed to get response: ' + err)
+      },
+      (artifacts) => {
+        streamedArtifacts = artifacts
       }
     )
   }, [isStreaming, currentConversationId, activeConnectors, addMessage, setStreaming, appendStreamChunk, finalizeStream])
@@ -93,16 +94,15 @@ export default function ChatInterface() {
             </div>
             <h2 className="text-xl font-semibold text-gray-800 mb-2">How can I help you today?</h2>
             <p className="text-sm text-gray-500 max-w-sm">
-              Ask me anything about your projects, documents, or data sources.
-              I can also generate reports, spreadsheets, and send emails.
+              Ask me anything about your system. I can also generate responses in Word, Excel, PDF, XML, JSON and more.
             </p>
             {/* Example prompts */}
             <div className="grid grid-cols-2 gap-3 mt-8 max-w-lg w-full">
               {[
-                'Summarise open Jira tickets for this sprint',
-                'Generate a PDF report on Q3 performance',
-                'What\'s in the latest Confluence release notes?',
-                'Create an Excel with last month\'s transactions',
+                'Summarize what this system does',
+                'Tell me about latest commits',
+                'Summarize open Jira tickets for this sprint',
+                'Create an excel with all repository details',
               ].map((prompt) => (
                 <button
                   key={prompt}
